@@ -257,8 +257,8 @@ function update(d){
   document.getElementById('funding').textContent=(d.funding_rate_pct||0).toFixed(4)+'%';
   document.getElementById('whale-count').textContent=d.whale_count_tracked||'--';
 
-  // === PIPELINE ===
-  const pipe=d.pipeline||{};
+  // === PIPELINE (v2 — proven signals only) ===
+  const pipe=d.pipeline_v2||d.pipeline||{};
   document.getElementById('pipeline-stage').textContent=pipe.stage||'';
   document.getElementById('pipeline-stage').style.color=pipe.ready?'var(--green)':pipe.direction?'var(--yellow)':'var(--dim)';
   const cpEl=document.getElementById('pipeline-checkpoints');
@@ -269,10 +269,8 @@ function update(d){
     if(cp.status==='PASS')icon='🟢';
     else if(cp.status==='FAIL')icon='🔴';
     else if(cp.status==='WEAK')icon='🟡';
-    else if(cp.status==='DANGER')icon='🛑';
-    else if(cp.status==='WARN')icon='🟠';
-    else if(cp.status==='CLEAR')icon='🟢';
-    cpHtml+=`<div class="cp-row"><span class="cp-icon">${icon}</span><span class="cp-name">${cp.name}</span><span class="cp-detail">${cp.detail}</span></div>`;
+    const wr=cp.win_rate?` (${cp.win_rate}%)`:'';
+    cpHtml+=`<div class="cp-row"><span class="cp-icon">${icon}</span><span class="cp-name">${cp.name}${wr}</span><span class="cp-detail">${cp.detail}</span></div>`;
   });
   cpEl.innerHTML=cpHtml||'<div style="color:var(--dim);font-size:0.65rem">Initializing...</div>';
   document.getElementById('signal-box').style.borderColor=pipe.ready?'var(--green)':pipe.direction?'var(--yellow)':'var(--cyan)';

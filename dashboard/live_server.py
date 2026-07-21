@@ -18,6 +18,7 @@ from modules.live.anomaly_detector import AnomalyDetector
 from modules.live.outcome_tracker import OutcomeTracker
 from modules.live.entry_exit_engine import EntryExitEngine
 from modules.live.signal_pipeline import SignalPipeline
+from modules.live.signal_pipeline_v2 import SignalPipelineV2
 from modules.live.cvd_engine import CVDEngine
 from modules.live.oi_delta import OIDeltaTracker
 from modules.live.liquidation_clusters import LiquidationClusters
@@ -33,6 +34,7 @@ anomaly = AnomalyDetector()
 outcome = OutcomeTracker()
 entry_exit = EntryExitEngine()
 pipeline = SignalPipeline()
+pipeline_v2 = SignalPipelineV2()
 cvd = CVDEngine()
 oi_delta = OIDeltaTracker()
 liq_clusters = LiquidationClusters()
@@ -90,8 +92,47 @@ def enhance_state(state):
     else:
         state["trade_signal"] = None
 
-    # Signal Pipeline (replaces raw signal with checkpoint-based)
+    # Signal Pipeline (v1 for backward compat)
     state["pipeline"] = pipeline.evaluate(state)
+
+    # Signal Pipeline v2 (proven signals only)
+    # We need candle data — fetch from engine's cached data
+    try:
+        import json, os
+        candle_file = "data/candles/ETHUSDT_1m_90d.json"
+        c1m = []
+        if os.path.exists(candle_file):
+            with open(candle_file) as f:
+                raw = json.load(f)
+                c1m = [{"close": c["close"], "high": c["high"], "low": c["low"], "volume": c["volume"]} for c in raw[-3600:]]
+
+        candle_file_5m = "data/candles/ETHUSDT_5m_90d.json"
+        c5m = []
+        if os.path.exists(candle_file_5m):
+            with open(candle_file_5m) as f:
+                raw = json.load(f)
+                c5m = [{"close": c["close"], "high": c["high"], "low": c["low"], "volume": c["volume"]} for c in raw[-200:]]
+
+        candle_file_15m = "data/candles/ETHUSDT_15m_90d.json"
+        c15m = []
+        if os.path.exists(candle_file_15m):
+            with open(candle_file_15m) as f:
+                raw = json.load(f)
+                c15m = [{"close": c["close"], "high": c["high"], "low": c["low"], "volume": c["volume"]} for c in raw[-200:]]
+
+        candle_file_1h = "data/candles/ETHUSDT_1h_90d.json"
+        c1h = []
+        if os.path.exists(candle_file_1h):
+            with open(candle_file_1h) as f:
+                raw = json.load(f)
+                c1h = [{"close": c["close"], "high": c["high"], "low": c["low"], "volume": c["volume"]} for c in raw[-200:]]
+
+        if c1m:
+            state["pipeline_v2"] = pipeline_v2.evaluate(c1m, c5m, c15m, c1h)
+        else:
+            state["pipeline_v2"] = pipeline_v2._empty("No candle data")
+    except Exception as e:
+        state["pipeline_v2"] = pipeline_v2._empty(str(e))
 
     enhanced_state = state
     return state
