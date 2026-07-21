@@ -354,26 +354,62 @@ h3 { font-size: 0.85rem; color: var(--blue); margin-bottom: 8px; text-transform:
   <div id="prediction-content"><div class="loading">Calculating prediction</div></div>
 </div>
 
+<div style="font-size:0.7rem;color:var(--text-dim);margin:12px 0;text-align:center;" id="api-status"></div>
+
 <script>
 const fmt = (n, d=2) => n != null ? n.toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d}) : '--';
 const fmtK = (n) => n != null ? (n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'K' : n.toFixed(0)) : '--';
 const fmtUSD = (n) => n != null ? '$' + fmt(n, 2) : '--';
 
-async function fetchJSON(url) {
+const apiStatus = {};
+function updateApiStatus(name, ok) {
+  apiStatus[name] = ok;
+  const el = document.getElementById('api-status');
+  if (!el) return;
+  let html = 'API Status: ';
+  for (const [k, v] of Object.entries(apiStatus)) {
+    html += `<span style="color:${v ? 'var(--green)' : 'var(--red)'};margin:0 4px;">${v ? '✓' : '✗'} ${k}</span> `;
+  }
+  el.innerHTML = html;
+}
+
+async function fetchJSON(url, timeout=15000) {
   try {
-    const r = await fetch(url);
-    if (!r.ok) throw new Error(r.statusText);
-    return await r.json();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
+    const r = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!r.ok) {
+      console.error('HTTP error:', url, r.status, r.statusText);
+      return null;
+    }
+    const text = await r.text();
+    if (!text || text.trim().length === 0) {
+      console.error('Empty response:', url);
+      return null;
+    }
+    try {
+      return JSON.parse(text);
+    } catch(e) {
+      console.error('JSON parse error:', url, 'first 200 chars:', text.substring(0, 200));
+      return null;
+    }
   } catch(e) {
-    console.error('Fetch error:', url, e);
+    if (e.name === 'AbortError') {
+      console.error('Timeout:', url, 'ms:', timeout);
+    } else {
+      console.error('Fetch error:', url, e.name, e.message);
+    }
     return null;
   }
 }
 
 async function loadPrice() {
-  const d = await fetchJSON('/api/price');
-  if (!d || d.error) return;
-  document.getElementById('price').textContent = fmtUSD(d.price);
+  try {
+    const d = await fetchJSON('/api/price');
+    if (!d || d.error) { updateApiStatus('price', false); return; }
+    updateApiStatus('price', true);
+    document.getElementById('price').textContent = fmtUSD(d.price);
   const chg = d.change_24h;
   const el = document.getElementById('price-change');
   el.textContent = (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%';
@@ -381,11 +417,14 @@ async function loadPrice() {
   document.getElementById('high-24h').textContent = fmtUSD(d.high_24h);
   document.getElementById('low-24h').textContent = fmtUSD(d.low_24h);
   document.getElementById('vol-24h').textContent = '$' + fmtK(d.volume_24h);
+  } catch(e) { updateApiStatus('price', false); }
 }
 
 async function loadOrderBook() {
-  const d = await fetchJSON('/api/orderbook');
-  if (!d || d.error) return;
+  try {
+    const d = await fetchJSON('/api/orderbook', 20000);
+    if (!d || d.error) { updateApiStatus('orderbook', false); return; }
+    updateApiStatus('orderbook', true);
 
   document.getElementById('buy-bar').style.width = d.bid_pct + '%';
   document.getElementById('buy-bar').textContent = d.bid_pct.toFixed(1) + '%';
@@ -423,11 +462,14 @@ async function loadOrderBook() {
     });
   } else { awHtml = '<li style="color:var(--text-dim)">No major walls detected</li>'; }
   document.getElementById('ask-walls').innerHTML = awHtml;
+  } catch(e) { updateApiStatus('orderbook', false); }
 }
 
 async function loadFunding() {
-  const d = await fetchJSON('/api/funding');
-  if (!d || d.error) return;
+  try {
+    const d = await fetchJSON('/api/funding', 20000);
+    if (!d || d.error) { updateApiStatus('funding', false); return; }
+    updateApiStatus('funding', true);
 
   const rateEl = document.getElementById('funding-rate');
   rateEl.textContent = d.current_rate_pct.toFixed(4) + '%';
@@ -439,11 +481,14 @@ async function loadFunding() {
 
   document.getElementById('funding-signal').textContent = d.signal;
   document.getElementById('open-interest').textContent = fmtK(d.open_interest) + ' ETH';
+  } catch(e) { updateApiStatus('funding', false); }
 }
 
 async function loadSentiment() {
-  const d = await fetchJSON('/api/sentiment');
-  if (!d || d.error) return;
+  try {
+    const d = await fetchJSON('/api/sentiment');
+    if (!d || d.error) { updateApiStatus('sentiment', false); return; }
+    updateApiStatus('sentiment', true);
 
   document.getElementById('fng-value').textContent = d.current_value;
   document.getElementById('fng-label').textContent = d.current_label;
@@ -457,11 +502,14 @@ async function loadSentiment() {
 
   document.getElementById('fng-trend').textContent = '7-day trend: ' + d.trend;
   document.getElementById('fng-signal').textContent = d.signal;
+  } catch(e) { updateApiStatus('sentiment', false); }
 }
 
 async function loadRegime() {
-  const d = await fetchJSON('/api/regime');
-  if (!d || d.error) return;
+  try {
+    const d = await fetchJSON('/api/regime', 20000);
+    if (!d || d.error) { updateApiStatus('regime', false); return; }
+    updateApiStatus('regime', true);
 
   const regimeEmoji = {'TRENDING_UP':'📈','TRENDING_DOWN':'📉','RANGING':'↔️','VOLATILE':'🌪️','ACCUMULATION':'🐋','DISTRIBUTION':'📤'};
   document.getElementById('regime-name').textContent = (regimeEmoji[d.regime]||'❓') + ' ' + d.regime;
@@ -487,11 +535,18 @@ async function loadRegime() {
     }
   }
   document.getElementById('regime-signals').innerHTML = sigHtml;
+  } catch(e) { updateApiStatus('regime', false); }
 }
 
 async function loadFundamentals() {
-  const d = await fetchJSON('/api/fundamentals');
-  if (!d || d.error) return;
+  try {
+    const d = await fetchJSON('/api/fundamentals', 20000);
+    if (!d || d.error) {
+      updateApiStatus('fundamentals', false);
+      document.getElementById('fund-narrative').textContent = 'Error: ' + (d?.error || 'API returned null');
+      return;
+    }
+    updateApiStatus('fundamentals', true);
 
   // Composite
   const compEl = document.getElementById('fund-composite-score');
@@ -512,6 +567,7 @@ async function loadFundamentals() {
 
   // Helper to render section items
   function renderSection(section, badgeId, containerId) {
+    if (!section || !section.items) { document.getElementById(containerId).innerHTML = '<div style="color:var(--text-dim)">No data</div>'; return; }
     const badge = document.getElementById(badgeId);
     badge.textContent = (section.score >= 0 ? '+' : '') + section.score;
     badge.className = 'score-badge ' + (section.score > 20 ? 'score-bullish' : section.score < -5 ? 'score-bearish' : 'score-neutral');
@@ -532,15 +588,19 @@ async function loadFundamentals() {
   renderSection(d.demand, 'demand-badge', 'demand-items');
   renderSection(d.liquidity, 'liquidity-badge', 'liquidity-items');
   renderSection(d.macro, 'macro-badge', 'macro-items');
+  } catch(e) { updateApiStatus('fundamentals', false); document.getElementById('fund-narrative').textContent = 'JS Error: ' + e.message; console.error('Fundamentals error:', e); }
 }
 
 async function loadPrediction() {
-  const d = await fetchJSON('/api/prediction');
-  const el = document.getElementById('prediction-content');
-  if (!d || d.error) {
-    el.innerHTML = '<div style="color:var(--red);">Error: ' + (d?.error || 'Failed to load') + '</div>';
-    return;
-  }
+  try {
+    const d = await fetchJSON('/api/prediction', 60000);
+    const el = document.getElementById('prediction-content');
+    if (!d || d.error) {
+      updateApiStatus('prediction', false);
+      el.innerHTML = '<div style="color:var(--red);">Error: ' + (d?.error || 'API returned null — check browser console (F12) for details') + '</div>';
+      return;
+    }
+    updateApiStatus('prediction', true);
 
   const dirEmoji = d.direction === 'UP' ? '📈' : '📉';
   const dirColor = d.direction === 'UP' ? 'var(--green)' : 'var(--red)';
@@ -593,19 +653,19 @@ async function loadPrediction() {
       </div>
     </div>
   `;
+  } catch(e) { updateApiStatus('prediction', false); document.getElementById('prediction-content').innerHTML = '<div style="color:var(--red);">Error loading prediction</div>'; }
 }
 
 async function refreshAll() {
   document.getElementById('last-update').textContent = 'Refreshing...';
-  await Promise.all([
-    loadPrice(),
-    loadOrderBook(),
-    loadFunding(),
-    loadSentiment(),
-    loadRegime(),
-    loadFundamentals(),
-    loadPrediction()
-  ]);
+  // Load sequentially to avoid overloading the server
+  await loadPrice();
+  await loadOrderBook();
+  await loadFunding();
+  await loadSentiment();
+  await loadRegime();
+  await loadFundamentals();
+  await loadPrediction();
   document.getElementById('last-update').textContent = 'Last update: ' + new Date().toLocaleTimeString();
 }
 

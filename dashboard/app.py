@@ -20,7 +20,32 @@ from modules.prediction.magnitude_predictor import MagnitudePredictor
 from modules.prediction.liquidity_map import LiquidityMap
 from modules.backtest.data_fetcher import DataFetcher
 
+from flask import Flask, render_template, jsonify, make_response
+
 app = Flask(__name__)
+
+import logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+# Cache for slow endpoints
+_cache = {}
+_cache_ttl = {}  # timestamp when cache expires
+import time
+
+def cached(key, ttl_seconds=300):
+    if key in _cache and time.time() < _cache_ttl.get(key, 0):
+        return _cache[key]
+    return None
+
+def cache_set(key, value, ttl_seconds=300):
+    _cache[key] = value
+    _cache_ttl[key] = time.time() + ttl_seconds
+
+@app.after_request
+def add_cors(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    return response
 
 # Single event loop for async calls
 loop = asyncio.new_event_loop()
@@ -350,11 +375,15 @@ def api_fundamentals():
 
 @app.route("/api/prediction")
 def api_prediction():
-    """Run the prediction engine"""
+    """Run the prediction engine (cached 5 min)"""
+    c = cached('prediction', 300)
+    if c:
+        return jsonify(c)
     try:
         from modules.prediction.prediction_engine import PredictionEngine
         engine = PredictionEngine()
         prediction = run_async(engine.predict("ETHUSDT"))
+        cache_set('prediction', prediction, 300)
         return jsonify(prediction)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -380,4 +409,4 @@ if __name__ == "__main__":
     print("Smart Money Dashboard")
     print("http://localhost:8888")
     print("=" * 50)
-    app.run(host="0.0.0.0", port=8888, debug=False)
+    app.run(host="0.0.0.0", port=8888, debug=False, threaded=True)
