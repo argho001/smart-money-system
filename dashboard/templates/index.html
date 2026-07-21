@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Money Dashboard</title>
+<style>
+:root {
+  --bg: #0a0e17;
+  --card: #111827;
+  --card-border: #1f2937;
+  --text: #e5e7eb;
+  --text-dim: #9ca3af;
+  --green: #10b981;
+  --green-dim: #065f46;
+  --red: #ef4444;
+  --red-dim: #7f1d1d;
+  --yellow: #f59e0b;
+  --yellow-dim: #78350f;
+  --blue: #3b82f6;
+  --purple: #8b5cf6;
+  --cyan: #06b6d4;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 16px;
+}
+h1 { font-size: 1.4rem; color: var(--cyan); margin-bottom: 4px; }
+h2 { font-size: 1rem; color: var(--text-dim); margin-bottom: 12px; font-weight: 500; }
+h3 { font-size: 0.85rem; color: var(--blue); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+.header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 20px; background: var(--card); border: 1px solid var(--card-border);
+  border-radius: 12px; margin-bottom: 16px;
+}
+.header .price-big { font-size: 2.2rem; font-weight: 700; }
+.header .change { font-size: 1.1rem; font-weight: 600; }
+.header .meta { text-align: right; }
+.header .meta span { display: block; font-size: 0.75rem; color: var(--text-dim); }
+.grid { display: grid; gap: 16px; margin-bottom: 16px; }
+.grid-2 { grid-template-columns: 1fr 1fr; }
+.grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+.grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+@media (max-width: 1200px) { .grid-4 { grid-template-columns: 1fr 1fr; } .grid-3 { grid-template-columns: 1fr; } }
+@media (max-width: 800px) { .grid-2, .grid-4 { grid-template-columns: 1fr; } }
+.card {
+  background: var(--card); border: 1px solid var(--card-border);
+  border-radius: 12px; padding: 16px;
+}
+.card-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--card-border);
+}
+.score-badge {
+  display: inline-block; padding: 4px 12px; border-radius: 20px;
+  font-weight: 700; font-size: 0.85rem;
+}
+.score-bullish { background: var(--green-dim); color: var(--green); }
+.score-bearish { background: var(--red-dim); color: var(--red); }
+.score-neutral { background: var(--yellow-dim); color: var(--yellow); }
+.score-bar {
+  width: 100%; height: 8px; background: #1f2937; border-radius: 4px;
+  overflow: hidden; margin: 8px 0;
+}
+.score-bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s; }
+.item-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 0; border-bottom: 1px solid #1a1f2e;
+  font-size: 0.8rem;
+}
+.item-row:last-child { border-bottom: none; }
+.item-name { color: var(--text-dim); }
+.item-value { font-weight: 600; }
+.status-bullish { color: var(--green); }
+.status-bearish { color: var(--red); }
+.status-neutral { color: var(--yellow); }
+.bar-chart { display: flex; align-items: flex-end; gap: 2px; height: 80px; margin: 12px 0; }
+.bar-chart .bar {
+  flex: 1; min-width: 4px; border-radius: 2px 2px 0 0;
+  transition: height 0.3s;
+}
+.bar-bid { background: var(--green); opacity: 0.7; }
+.bar-ask { background: var(--red); opacity: 0.7; }
+.pressure-meter {
+  display: flex; height: 32px; border-radius: 8px; overflow: hidden;
+  margin: 12px 0; position: relative;
+}
+.pressure-meter .buy-side {
+  background: linear-gradient(90deg, #065f46, #10b981);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 0.85rem; transition: width 0.5s;
+}
+.pressure-meter .sell-side {
+  background: linear-gradient(90deg, #ef4444, #7f1d1d);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 0.85rem; transition: width 0.5s;
+}
+.wall-list { list-style: none; }
+.wall-list li {
+  display: flex; justify-content: space-between; padding: 4px 0;
+  font-size: 0.75rem; border-bottom: 1px solid #1a1f2e;
+}
+.wall-list li:last-child { border-bottom: none; }
+.prediction-box {
+  text-align: center; padding: 20px;
+}
+.prediction-box .direction {
+  font-size: 2rem; font-weight: 700; margin: 8px 0;
+}
+.prediction-box .move {
+  font-size: 1.5rem; font-weight: 600;
+}
+.target-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; margin: 4px 0; background: #1a1f2e; border-radius: 8px;
+  font-size: 0.8rem;
+}
+.confidence-visual {
+  display: flex; align-items: center; gap: 12px; margin: 12px 0;
+}
+.conf-dots { display: flex; gap: 4px; }
+.conf-dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: #1f2937; transition: background 0.3s;
+}
+.conf-dot.active { background: var(--green); }
+.conf-dot.warn { background: var(--yellow); }
+.conf-dot.danger { background: var(--red); }
+.fear-greed-gauge {
+  width: 120px; height: 60px; margin: 0 auto 8px;
+  position: relative; overflow: hidden;
+}
+.narrative-box {
+  background: #1a1f2e; border-left: 3px solid var(--cyan);
+  padding: 12px 16px; margin-top: 12px; border-radius: 0 8px 8px 0;
+  font-size: 0.85rem; line-height: 1.5;
+}
+.refresh-btn {
+  background: var(--blue); color: white; border: none; padding: 6px 16px;
+  border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 0.75rem;
+}
+.refresh-btn:hover { opacity: 0.8; }
+.loading { text-align: center; color: var(--text-dim); padding: 20px; }
+.loading::after { content: ''; animation: dots 1.5s infinite; }
+@keyframes dots {
+  0% { content: '.'; } 33% { content: '..'; } 66% { content: '...'; }
+}
+.pulse { animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+.section-title {
+  font-size: 1.1rem; color: var(--text); font-weight: 600;
+  margin: 24px 0 12px; display: flex; align-items: center; gap: 8px;
+}
+.section-title::after {
+  content: ''; flex: 1; height: 1px; background: var(--card-border);
+}
+#last-update { font-size: 0.7rem; color: var(--text-dim); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>🧠 Smart Money Dashboard</h1>
+    <h2>Ethereum Market Intelligence</h2>
+  </div>
+  <div style="text-align:center;">
+    <div class="price-big" id="price">--</div>
+    <div class="change" id="price-change">--</div>
+  </div>
+  <div class="meta">
+    <span id="last-update">Loading...</span>
+    <button class="refresh-btn" onclick="refreshAll()" style="margin-top:6px;">⟳ Refresh</button>
+  </div>
+</div>
+
+<!-- ==================== PRICE STATS ==================== -->
+<div class="grid grid-4" id="price-stats">
+  <div class="card" style="text-align:center;">
+    <div style="font-size:0.7rem;color:var(--text-dim);">24h HIGH</div>
+    <div style="font-size:1.1rem;color:var(--green);font-weight:600;" id="high-24h">--</div>
+  </div>
+  <div class="card" style="text-align:center;">
+    <div style="font-size:0.7rem;color:var(--text-dim);">24h LOW</div>
+    <div style="font-size:1.1rem;color:var(--red);font-weight:600;" id="low-24h">--</div>
+  </div>
+  <div class="card" style="text-align:center;">
+    <div style="font-size:0.7rem;color:var(--text-dim);">24h VOLUME</div>
+    <div style="font-size:1.1rem;font-weight:600;" id="vol-24h">--</div>
+  </div>
+  <div class="card" style="text-align:center;">
+    <div style="font-size:0.7rem;color:var(--text-dim);">REGIME</div>
+    <div style="font-size:1.1rem;font-weight:600;" id="regime-badge">--</div>
+  </div>
+</div>
+
+<!-- ==================== BUY vs SELL PRESSURE ==================== -->
+<div class="section-title">📊 Who Has Bigger Demand — Buy or Sell?</div>
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-header">
+      <h3>Bid vs Ask Pressure</h3>
+      <span class="score-badge" id="ob-score">--</span>
+    </div>
+    <div class="pressure-meter">
+      <div class="buy-side" id="buy-bar" style="width:50%">--%</div>
+      <div class="sell-side" id="sell-bar" style="width:50%">--%</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text-dim);">
+      <span>🟢 BIDS (Buyers)</span>
+      <span>🔴 ASKS (Sellers)</span>
+    </div>
+    <div style="margin-top:12px;">
+      <div class="item-row">
+        <span class="item-name">Bid Volume (1% range)</span>
+        <span class="item-value status-bullish" id="bid-vol">--</span>
+      </div>
+      <div class="item-row">
+        <span class="item-name">Ask Volume (1% range)</span>
+        <span class="item-value status-bearish" id="ask-vol">--</span>
+      </div>
+      <div class="item-row">
+        <span class="item-name">Net Imbalance</span>
+        <span class="item-value" id="ob-imbalance">--</span>
+      </div>
+    </div>
+    <div id="ob-signal" class="narrative-box" style="margin-top:12px;">Loading...</div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3>Order Book Depth</h3>
+    </div>
+    <div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:4px;">
+      Price levels within 2% of current price
+    </div>
+    <div style="display:flex;gap:8px;">
+      <div style="flex:1;">
+        <div style="font-size:0.7rem;color:var(--green);margin-bottom:4px;">🟢 BID WALLS (Support)</div>
+        <ul class="wall-list" id="bid-walls"><li>Loading...</li></ul>
+      </div>
+      <div style="flex:1;">
+        <div style="font-size:0.7rem;color:var(--red);margin-bottom:4px;">🔴 ASK WALLS (Resistance)</div>
+        <ul class="wall-list" id="ask-walls"><li>Loading...</li></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== FUNDAMENTAL DASHBOARD ==================== -->
+<div class="section-title">🏦 Fundamental Analysis</div>
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-header">
+    <h3>Composite Fundamental Score</h3>
+    <span class="score-badge" id="fund-composite-badge">--</span>
+  </div>
+  <div style="text-align:center;font-size:2rem;font-weight:700;margin:12px 0;" id="fund-composite-score">--</div>
+  <div class="score-bar"><div class="score-bar-fill" id="fund-composite-bar" style="width:50%;background:var(--yellow);"></div></div>
+  <div class="narrative-box" id="fund-narrative">Loading...</div>
+</div>
+
+<div class="grid grid-4">
+  <!-- SUPPLY -->
+  <div class="card">
+    <div class="card-header">
+      <h3>📦 Supply Score</h3>
+      <span class="score-badge" id="supply-badge">--</span>
+    </div>
+    <div id="supply-items">Loading...</div>
+  </div>
+  <!-- DEMAND -->
+  <div class="card">
+    <div class="card-header">
+      <h3>🔥 Demand Score</h3>
+      <span class="score-badge" id="demand-badge">--</span>
+    </div>
+    <div id="demand-items">Loading...</div>
+  </div>
+  <!-- LIQUIDITY -->
+  <div class="card">
+    <div class="card-header">
+      <h3>💧 Liquidity Score</h3>
+      <span class="score-badge" id="liquidity-badge">--</span>
+    </div>
+    <div id="liquidity-items">Loading...</div>
+  </div>
+  <!-- MACRO -->
+  <div class="card">
+    <div class="card-header">
+      <h3>🌍 Macro Score</h3>
+      <span class="score-badge" id="macro-badge">--</span>
+    </div>
+    <div id="macro-items">Loading...</div>
+  </div>
+</div>
+
+<!-- ==================== FUNDING & SENTIMENT ==================== -->
+<div class="section-title">📡 Signals</div>
+<div class="grid grid-3">
+  <div class="card">
+    <div class="card-header">
+      <h3>Funding Rate</h3>
+      <span class="score-badge" id="funding-score">--</span>
+    </div>
+    <div style="text-align:center;">
+      <div style="font-size:1.8rem;font-weight:700;" id="funding-rate">--</div>
+      <div style="font-size:0.75rem;color:var(--text-dim);margin:4px 0;">8h funding rate</div>
+    </div>
+    <div id="funding-signal" class="narrative-box" style="margin-top:12px;">Loading...</div>
+    <div style="margin-top:8px;">
+      <div class="item-row">
+        <span class="item-name">Open Interest</span>
+        <span class="item-value" id="open-interest">--</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3>Fear & Greed Index</h3>
+      <span class="score-badge" id="fng-score">--</span>
+    </div>
+    <div style="text-align:center;">
+      <div style="font-size:2.5rem;font-weight:700;" id="fng-value">--</div>
+      <div style="font-size:0.9rem;font-weight:600;" id="fng-label">--</div>
+      <div style="font-size:0.75rem;color:var(--text-dim);margin:4px 0;" id="fng-trend">--</div>
+    </div>
+    <div id="fng-signal" class="narrative-box" style="margin-top:12px;">Loading...</div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3>🧠 Market Regime</h3>
+    </div>
+    <div style="text-align:center;">
+      <div style="font-size:1.8rem;font-weight:700;" id="regime-name">--</div>
+      <div style="font-size:0.8rem;color:var(--text-dim);margin:8px 0;" id="regime-desc">--</div>
+      <div class="confidence-visual" style="justify-content:center;">
+        <span style="font-size:0.75rem;">Confidence:</span>
+        <div class="conf-dots" id="regime-conf-dots"></div>
+      </div>
+    </div>
+    <div style="margin-top:12px;" id="regime-signals">Loading...</div>
+  </div>
+</div>
+
+<!-- ==================== PREDICTION ==================== -->
+<div class="section-title">🎯 Prediction — Where, How Far, When</div>
+<div class="card" style="margin-bottom:16px;">
+  <div id="prediction-content"><div class="loading">Calculating prediction</div></div>
+</div>
+
+<script>
+const fmt = (n, d=2) => n != null ? n.toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d}) : '--';
+const fmtK = (n) => n != null ? (n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'K' : n.toFixed(0)) : '--';
+const fmtUSD = (n) => n != null ? '$' + fmt(n, 2) : '--';
+
+async function fetchJSON(url) {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(r.statusText);
+    return await r.json();
+  } catch(e) {
+    console.error('Fetch error:', url, e);
+    return null;
+  }
+}
+
+async function loadPrice() {
+  const d = await fetchJSON('/api/price');
+  if (!d || d.error) return;
+  document.getElementById('price').textContent = fmtUSD(d.price);
+  const chg = d.change_24h;
+  const el = document.getElementById('price-change');
+  el.textContent = (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%';
+  el.style.color = chg >= 0 ? 'var(--green)' : 'var(--red)';
+  document.getElementById('high-24h').textContent = fmtUSD(d.high_24h);
+  document.getElementById('low-24h').textContent = fmtUSD(d.low_24h);
+  document.getElementById('vol-24h').textContent = '$' + fmtK(d.volume_24h);
+}
+
+async function loadOrderBook() {
+  const d = await fetchJSON('/api/orderbook');
+  if (!d || d.error) return;
+
+  document.getElementById('buy-bar').style.width = d.bid_pct + '%';
+  document.getElementById('buy-bar').textContent = d.bid_pct.toFixed(1) + '%';
+  document.getElementById('sell-bar').style.width = d.ask_pct + '%';
+  document.getElementById('sell-bar').textContent = d.ask_pct.toFixed(1) + '%';
+
+  document.getElementById('bid-vol').textContent = '$' + fmtK(d.bid_volume_usd);
+  document.getElementById('ask-vol').textContent = '$' + fmtK(d.ask_volume_usd);
+
+  const imb = d.imbalance;
+  const imbEl = document.getElementById('ob-imbalance');
+  imbEl.textContent = (imb >= 0 ? '+' : '') + imb.toFixed(1) + '%';
+  imbEl.style.color = imb > 5 ? 'var(--green)' : imb < -5 ? 'var(--red)' : 'var(--yellow)';
+
+  const scoreEl = document.getElementById('ob-score');
+  scoreEl.textContent = (d.score >= 0 ? '+' : '') + d.score;
+  scoreEl.className = 'score-badge ' + (d.score > 20 ? 'score-bullish' : d.score < -20 ? 'score-bearish' : 'score-neutral');
+
+  document.getElementById('ob-signal').textContent = d.signal;
+
+  // Bid walls
+  let bwHtml = '';
+  if (d.bid_walls && d.bid_walls.length) {
+    d.bid_walls.forEach(w => {
+      bwHtml += `<li><span>$${fmt(w.price)}</span><span style="color:var(--green)">$${fmtK(w.value)} (${w.multiple.toFixed(0)}x)</span></li>`;
+    });
+  } else { bwHtml = '<li style="color:var(--text-dim)">No major walls detected</li>'; }
+  document.getElementById('bid-walls').innerHTML = bwHtml;
+
+  // Ask walls
+  let awHtml = '';
+  if (d.ask_walls && d.ask_walls.length) {
+    d.ask_walls.forEach(w => {
+      awHtml += `<li><span>$${fmt(w.price)}</span><span style="color:var(--red)">$${fmtK(w.value)} (${w.multiple.toFixed(0)}x)</span></li>`;
+    });
+  } else { awHtml = '<li style="color:var(--text-dim)">No major walls detected</li>'; }
+  document.getElementById('ask-walls').innerHTML = awHtml;
+}
+
+async function loadFunding() {
+  const d = await fetchJSON('/api/funding');
+  if (!d || d.error) return;
+
+  const rateEl = document.getElementById('funding-rate');
+  rateEl.textContent = d.current_rate_pct.toFixed(4) + '%';
+  rateEl.style.color = d.current_rate_pct > 0.05 ? 'var(--red)' : d.current_rate_pct < -0.05 ? 'var(--green)' : 'var(--yellow)';
+
+  const scoreEl = document.getElementById('funding-score');
+  scoreEl.textContent = (d.score >= 0 ? '+' : '') + d.score;
+  scoreEl.className = 'score-badge ' + (d.score > 20 ? 'score-bullish' : d.score < -20 ? 'score-bearish' : 'score-neutral');
+
+  document.getElementById('funding-signal').textContent = d.signal;
+  document.getElementById('open-interest').textContent = fmtK(d.open_interest) + ' ETH';
+}
+
+async function loadSentiment() {
+  const d = await fetchJSON('/api/sentiment');
+  if (!d || d.error) return;
+
+  document.getElementById('fng-value').textContent = d.current_value;
+  document.getElementById('fng-label').textContent = d.current_label;
+
+  const val = d.current_value;
+  document.getElementById('fng-value').style.color = val <= 25 ? 'var(--red)' : val <= 45 ? 'var(--yellow)' : val <= 55 ? 'var(--text)' : val <= 75 ? 'var(--yellow)' : 'var(--red)';
+
+  const scoreEl = document.getElementById('fng-score');
+  scoreEl.textContent = (d.score >= 0 ? '+' : '') + d.score;
+  scoreEl.className = 'score-badge ' + (d.score > 20 ? 'score-bullish' : d.score < -20 ? 'score-bearish' : 'score-neutral');
+
+  document.getElementById('fng-trend').textContent = '7-day trend: ' + d.trend;
+  document.getElementById('fng-signal').textContent = d.signal;
+}
+
+async function loadRegime() {
+  const d = await fetchJSON('/api/regime');
+  if (!d || d.error) return;
+
+  const regimeEmoji = {'TRENDING_UP':'📈','TRENDING_DOWN':'📉','RANGING':'↔️','VOLATILE':'🌪️','ACCUMULATION':'🐋','DISTRIBUTION':'📤'};
+  document.getElementById('regime-name').textContent = (regimeEmoji[d.regime]||'❓') + ' ' + d.regime;
+  document.getElementById('regime-desc').textContent = d.description;
+  document.getElementById('regime-badge').textContent = d.regime;
+
+  // Confidence dots
+  const dotsEl = document.getElementById('regime-conf-dots');
+  let dots = '';
+  const conf = Math.round(d.confidence * 10);
+  for (let i = 0; i < 10; i++) {
+    const cls = i < conf ? (conf >= 7 ? 'active' : conf >= 4 ? 'warn' : 'danger') : '';
+    dots += `<div class="conf-dot ${cls}"></div>`;
+  }
+  dotsEl.innerHTML = dots;
+
+  // Sub-signals
+  let sigHtml = '';
+  if (d.sub_signals) {
+    for (const [name, sig] of Object.entries(d.sub_signals)) {
+      const color = sig.score > 0.2 ? 'var(--green)' : sig.score < -0.2 ? 'var(--red)' : 'var(--yellow)';
+      sigHtml += `<div class="item-row"><span class="item-name">${name}</span><span style="color:${color}">${sig.desc}</span></div>`;
+    }
+  }
+  document.getElementById('regime-signals').innerHTML = sigHtml;
+}
+
+async function loadFundamentals() {
+  const d = await fetchJSON('/api/fundamentals');
+  if (!d || d.error) return;
+
+  // Composite
+  const compEl = document.getElementById('fund-composite-score');
+  compEl.textContent = (d.composite_score >= 0 ? '+' : '') + d.composite_score + ' — ' + d.bias;
+  compEl.style.color = d.composite_score > 15 ? 'var(--green)' : d.composite_score < -15 ? 'var(--red)' : 'var(--yellow)';
+
+  const badge = document.getElementById('fund-composite-badge');
+  badge.textContent = d.bias;
+  badge.className = 'score-badge ' + (d.composite_score > 15 ? 'score-bullish' : d.composite_score < -15 ? 'score-bearish' : 'score-neutral');
+
+  // Bar
+  const barPct = Math.min(100, Math.max(0, (d.composite_score + 100) / 2));
+  const bar = document.getElementById('fund-composite-bar');
+  bar.style.width = barPct + '%';
+  bar.style.background = d.composite_score > 15 ? 'var(--green)' : d.composite_score < -15 ? 'var(--red)' : 'var(--yellow)';
+
+  document.getElementById('fund-narrative').textContent = d.narrative;
+
+  // Helper to render section items
+  function renderSection(section, badgeId, containerId) {
+    const badge = document.getElementById(badgeId);
+    badge.textContent = (section.score >= 0 ? '+' : '') + section.score;
+    badge.className = 'score-badge ' + (section.score > 20 ? 'score-bullish' : section.score < -5 ? 'score-bearish' : 'score-neutral');
+
+    let html = '';
+    section.items.forEach(item => {
+      const colorClass = 'status-' + item.status;
+      html += `<div class="item-row">
+        <span class="item-name">${item.emoji} ${item.name}</span>
+        <span class="item-value ${colorClass}">${item.value}</span>
+      </div>
+      <div style="font-size:0.65rem;color:var(--text-dim);padding:0 0 4px;">${item.detail}</div>`;
+    });
+    document.getElementById(containerId).innerHTML = html;
+  }
+
+  renderSection(d.supply, 'supply-badge', 'supply-items');
+  renderSection(d.demand, 'demand-badge', 'demand-items');
+  renderSection(d.liquidity, 'liquidity-badge', 'liquidity-items');
+  renderSection(d.macro, 'macro-badge', 'macro-items');
+}
+
+async function loadPrediction() {
+  const d = await fetchJSON('/api/prediction');
+  const el = document.getElementById('prediction-content');
+  if (!d || d.error) {
+    el.innerHTML = '<div style="color:var(--red);">Error: ' + (d?.error || 'Failed to load') + '</div>';
+    return;
+  }
+
+  const dirEmoji = d.direction === 'UP' ? '📈' : '📉';
+  const dirColor = d.direction === 'UP' ? 'var(--green)' : 'var(--red)';
+  const confPct = Math.round(d.confidence * 100);
+  const confLabel = confPct >= 75 ? 'HIGH' : confPct >= 50 ? 'MEDIUM' : 'LOW';
+  const confColor = confPct >= 75 ? 'var(--green)' : confPct >= 50 ? 'var(--yellow)' : 'var(--red)';
+
+  let targetsHtml = '';
+  if (d.targets) {
+    for (const [sigma, t] of Object.entries(d.targets)) {
+      targetsHtml += `<div class="target-row">
+        <span>${sigma}</span>
+        <span>$${fmt(t.price)}</span>
+        <span style="color:${t.pct >= 0 ? 'var(--green)' : 'var(--red)'}">${t.pct >= 0 ? '+' : ''}${t.pct.toFixed(2)}%</span>
+        <span style="color:var(--text-dim)">${(t.probability*100).toFixed(0)}% prob</span>
+      </div>`;
+    }
+  }
+
+  el.innerHTML = `
+    <div class="prediction-box">
+      <div style="font-size:0.85rem;color:var(--text-dim);">PREDICTION</div>
+      <div class="direction" style="color:${dirColor}">${dirEmoji} ${d.direction}</div>
+      <div class="move" style="color:${dirColor}">
+        ${d.direction === 'DOWN' ? '-' : '+'}${d.expected_move_pct.toFixed(1)}%
+      </div>
+      <div style="font-size:0.85rem;color:var(--text-dim);margin:4px 0;">
+        in ~${d.expected_timeframe_days.toFixed(0)} days
+      </div>
+    </div>
+    <div style="text-align:center;margin:12px 0;">
+      <span style="font-size:0.85rem;">Confidence: </span>
+      <span style="color:${confColor};font-weight:700;font-size:1.1rem;">${confLabel} (${confPct}%)</span>
+    </div>
+    <div style="max-width:500px;margin:0 auto;">
+      ${targetsHtml}
+    </div>
+    <div style="margin-top:16px;display:flex;gap:16px;justify-content:center;font-size:0.8rem;">
+      <div>
+        <span style="color:var(--text-dim);">Regime:</span>
+        <span>${d.regime?.regime || '--'}</span>
+      </div>
+      <div>
+        <span style="color:var(--text-dim);">Signal:</span>
+        <span>${d.signal_score?.toFixed(1) || '--'}</span>
+      </div>
+      <div>
+        <span style="color:var(--text-dim);">Analog consensus:</span>
+        <span>${d.analogs?.consensus || '--'}</span>
+      </div>
+    </div>
+  `;
+}
+
+async function refreshAll() {
+  document.getElementById('last-update').textContent = 'Refreshing...';
+  await Promise.all([
+    loadPrice(),
+    loadOrderBook(),
+    loadFunding(),
+    loadSentiment(),
+    loadRegime(),
+    loadFundamentals(),
+    loadPrediction()
+  ]);
+  document.getElementById('last-update').textContent = 'Last update: ' + new Date().toLocaleTimeString();
+}
+
+// Initial load
+refreshAll();
+
+// Auto-refresh every 60 seconds
+setInterval(refreshAll, 60000);
+</script>
+</body>
+</html>
