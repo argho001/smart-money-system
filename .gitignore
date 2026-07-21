@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Data files (too large for git)
+data/candles/
+data/backtests/
+data/*.db
+data/*.json
+!data/.gitkeep
+
+# Logs
+logs/*.log
+!logs/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# API Keys (NEVER commit these)
+.env
+*.env.local
+config/settings.py
+
+# Cache
+*.cache
+.mypy_cache/
+.pytest_cache/
