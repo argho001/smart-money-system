@@ -17,6 +17,7 @@ from modules.live.live_engine import LiveDataEngine
 from modules.live.anomaly_detector import AnomalyDetector
 from modules.live.outcome_tracker import OutcomeTracker
 from modules.live.entry_exit_engine import EntryExitEngine
+from modules.live.signal_pipeline import SignalPipeline
 from modules.live.cvd_engine import CVDEngine
 from modules.live.oi_delta import OIDeltaTracker
 from modules.live.liquidation_clusters import LiquidationClusters
@@ -31,6 +32,7 @@ engine = LiveDataEngine()
 anomaly = AnomalyDetector()
 outcome = OutcomeTracker()
 entry_exit = EntryExitEngine()
+pipeline = SignalPipeline()
 cvd = CVDEngine()
 oi_delta = OIDeltaTracker()
 liq_clusters = LiquidationClusters()
@@ -87,6 +89,9 @@ def enhance_state(state):
         state["trade_signal"] = entry_exit.last_signal
     else:
         state["trade_signal"] = None
+
+    # Signal Pipeline (replaces raw signal with checkpoint-based)
+    state["pipeline"] = pipeline.evaluate(state)
 
     enhanced_state = state
     return state
