@@ -4,9 +4,17 @@ Smart Money System - Main Entry Point
 Usage:
     python3 main.py start        - Start the full system
     python3 main.py listen       - Start blockchain listener only
+    python3 main.py live         - Start integrated system (live)
+    python3 main.py predict      - Run prediction engine (WHERE/HOW FAR/WHEN)
+    python3 main.py regime       - Detect current market regime
+    python3 main.py accuracy     - Show prediction accuracy stats
+    python3 main.py test         - Test all components
+    python3 main.py test-signals - Test signal engine
     python3 main.py test-telegram - Test Telegram connection
     python3 main.py test-db      - Test database
     python3 main.py status       - Show system status
+    python3 main.py performance  - Show performance report
+    python3 main.py paper        - Paper trading status
 """
 
 import asyncio
@@ -206,6 +214,41 @@ def main():
         from modules.integrated_system import IntegratedSystem
         system = IntegratedSystem(portfolio_value=10000)
         asyncio.run(system.run())
+    
+    elif command == "predict":
+        print("Running Prediction Engine...")
+        print("=" * 50)
+        from modules.prediction.prediction_engine import PredictionEngine
+        engine = PredictionEngine()
+        prediction = asyncio.run(engine.predict("ETHUSDT"))
+        if "error" not in prediction:
+            report = engine.format_prediction(prediction)
+            print(report)
+        else:
+            print(f"Error: {prediction['error']}")
+    
+    elif command == "accuracy":
+        from modules.prediction.confidence_tracker import ConfidenceTracker
+        tracker = ConfidenceTracker()
+        print(tracker.format_accuracy())
+    
+    elif command == "regime":
+        print("Detecting market regime...")
+        from modules.prediction.regime_detector import RegimeDetector
+        from modules.backtest.data_fetcher import DataFetcher
+        fetcher = DataFetcher()
+        candles = asyncio.run(fetcher.get_historical_data("ETHUSDT", "1h", 30))
+        if candles:
+            detector = RegimeDetector()
+            regime = detector.detect(candles)
+            print(f"\nRegime: {regime['regime']}")
+            print(f"Confidence: {regime['confidence']}")
+            print(f"Description: {regime['description']}")
+            print(f"\nSub-signals:")
+            for name, sig in regime['sub_signals'].items():
+                print(f"  {name}: {sig['score']:+.2f} — {sig['desc']}")
+        else:
+            print("Failed to fetch data")
     
     elif command == "test":
         asyncio.run(test_system())

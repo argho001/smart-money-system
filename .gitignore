@@ -41,3 +41,5 @@ config/settings.py
 *.cache
 .mypy_cache/
 .pytest_cache/
+config/settings.py
+data/
