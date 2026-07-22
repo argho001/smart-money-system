@@ -131,8 +131,9 @@ class TradeManager:
             if result.get("success"):
                 self.stats["total_trades"] += 1
                 self.stats["open_positions"] += 1
-                # Register SL/TP for monitoring
-                self._register_stop(direction, sl, tp, entry)
+                # Register SL/TP for monitoring with trailing stop
+                trail_dist = signal.get("trail_distance", 0)
+                self._register_stop(direction, sl, tp, entry, trail_distance=trail_dist)
                 print(f"[TRADE] OPENED {direction} @ ${entry:.2f} | SL ${sl:.2f} | TP ${tp:.2f} | ${usdt_amount:.0f} margin")
 
         self.trade_log.append(trade_info)
@@ -262,15 +263,20 @@ class TradeManager:
         with open("data/trades/trade_log.json", "w") as f:
             json.dump(self.trade_log, f, indent=2, default=str)
 
-    def _register_stop(self, direction, sl, tp, entry):
-        """Register SL/TP for monitoring."""
+    def _register_stop(self, direction, sl, tp, entry, trail_distance=0):
+        """Register SL/TP for monitoring. trail_distance > 0 enables trailing stop."""
         self.active_stops[direction] = {
             "sl": sl,
             "tp": tp,
             "entry": entry,
             "time": time.time(),
+            "trail_distance": trail_distance,
+            "trail_active": False,
+            "best_price": entry,  # Track best price for trailing
+            "original_sl": sl,
         }
-        print(f"[MONITOR] Registered {direction} SL=${sl:.2f} TP=${tp:.2f}")
+        trail_str = f" | Trail: ${trail_distance:.2f}" if trail_distance else ""
+        print(f"[MONITOR] Registered {direction} SL=${sl:.2f} TP=${tp:.2f}{trail_str}")
 
     def _remove_stop(self, direction):
         """Remove SL/TP tracking."""
@@ -308,10 +314,59 @@ class TradeManager:
                 for direction, stop in list(self.active_stops.items()):
                     sl = stop["sl"]
                     tp = stop["tp"]
+                    trail_dist = stop.get("trail_distance", 0)
+                    trail_active = stop.get("trail_active", False)
+                    best_price = stop.get("best_price", stop["entry"])
 
                     hit_sl = False
                     hit_tp = False
 
+                    # Update best price for trailing
+                    if direction == "LONG":
+                        if current_price > best_price:
+                            stop["best_price"] = current_price
+                            best_price = current_price
+                    else:
+                        if current_price < best_price:
+                            stop["best_price"] = current_price
+                            best_price = current_price
+
+                    # Activate trailing stop when 1R profit reached
+                    if trail_dist > 0 and not trail_active:
+                        entry = stop["entry"]
+                        original_sl = stop.get("original_sl", sl)
+                        risk = abs(entry - original_sl)
+                        if direction == "LONG" and current_price >= entry + risk:
+                            stop["trail_active"] = True
+                            trail_active = True
+                            new_sl = current_price - trail_dist
+                            if new_sl > sl:
+                                stop["sl"] = new_sl
+                                sl = new_sl
+                            print(f"[MONITOR] TRAILING activated for {direction} @ ${current_price:.2f} — new SL ${sl:.2f}")
+                        elif direction == "SHORT" and current_price <= entry - risk:
+                            stop["trail_active"] = True
+                            trail_active = True
+                            new_sl = current_price + trail_dist
+                            if new_sl < sl:
+                                stop["sl"] = new_sl
+                                sl = new_sl
+                            print(f"[MONITOR] TRAILING activated for {direction} @ ${current_price:.2f} — new SL ${sl:.2f}")
+
+                    # Update trailing SL (move in profit direction)
+                    if trail_active and trail_dist > 0:
+                        if direction == "LONG":
+                            new_sl = best_price - trail_dist
+                            if new_sl > sl:
+                                stop["sl"] = new_sl
+                                sl = new_sl
+                        else:
+                            new_sl = best_price + trail_dist
+                            if new_sl < sl:
+                                stop["sl"] = new_sl
+                                sl = new_sl
+
+                    # Check SL/TP hits
                     if direction == "LONG":
                         if current_price <= sl:
                             hit_sl = True
@@ -325,7 +380,8 @@ class TradeManager:
 
                     if hit_sl or hit_tp:
                         result_type = "SL" if hit_sl else "TP"
-                        print(f"[MONITOR] {result_type} HIT for {direction} @ ${current_price:.2f} (target was ${sl if hit_sl else tp:.2f})")
+                        trail_note = " (trailing)" if trail_active and hit_sl else ""
+                        print(f"[MONITOR] {result_type} HIT{trail_note} for {direction} @ ${current_price:.2f} (target was ${sl if hit_sl else tp:.2f})")
                         to_close.append((direction, result_type, current_price))
 
                 # Close positions that hit SL/TP
@@ -368,9 +424,9 @@ class TradeManager:
 
             time.sleep(1)  # Check every 1 second
 
-    def register_manual_stop(self, direction, sl, tp, entry):
+    def register_manual_stop(self, direction, sl, tp, entry, trail_distance=0):
         """Register SL/TP for manually opened positions."""
-        self._register_stop(direction, sl, tp, entry)
+        self._register_stop(direction, sl, tp, entry, trail_distance=trail_distance)
 
     def get_formatted_status(self):
         """Get status formatted for dashboard display."""

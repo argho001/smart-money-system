@@ -19,6 +19,8 @@ from modules.live.anomaly_detector import AnomalyDetector
 from modules.live.outcome_tracker import OutcomeTracker
 from modules.live.entry_exit_engine import EntryExitEngine
 from modules.live.signal_pipeline import SignalPipeline
+from modules.live.contrarian_pipeline import ContrarianPipeline
+from modules.live.atr_engine import ATREngine
 from modules.live.cvd_engine import CVDEngine
 from modules.live.oi_delta import OIDeltaTracker
 from modules.live.liquidation_clusters import LiquidationClusters
@@ -34,6 +36,8 @@ anomaly = AnomalyDetector()
 outcome = OutcomeTracker()
 entry_exit = EntryExitEngine()
 pipeline = SignalPipeline()
+contrarian = ContrarianPipeline()
+atr = ATREngine(period=14)
 cvd = CVDEngine()
 oi_delta = OIDeltaTracker()
 liq_clusters = LiquidationClusters()
@@ -65,6 +69,11 @@ _engine_ready = False
 
 def enhance_state(state):
     global enhanced_state, _oi_fetch_counter
+
+    # Update ATR with current price
+    price = state.get("price", 0)
+    if price > 0:
+        atr.update(price)
 
     # CVD
     trades = list(engine._last_trades)[-100:]
@@ -106,14 +115,21 @@ def enhance_state(state):
     else:
         state["trade_signal"] = None
 
-    # Pipeline v3
+    # Pipeline v3 (legacy — still available)
     state["pipeline"] = pipeline.evaluate(state)
+
+    # Contrarian Pipeline v4 (new — primary signal)
+    state["contrarian"] = contrarian.evaluate(state, atr)
+
+    # ATR state
+    state["atr"] = atr.get_state()
 
     # Trade status
     if trade_mgr:
         state["trade_status"] = trade_mgr.get_formatted_status()
-        # Auto-execute ONLY if no open position
-        if trade_mgr.auto_trade and state["pipeline"].get("ready"):
+        # Auto-execute with CONTRARIAN signals (not legacy pipeline)
+        contrarian_signal = state.get("contrarian", {})
+        if trade_mgr.auto_trade and contrarian_signal.get("ready"):
             # Check if there's already an open position
             has_position = False
             for pos in trade_mgr.executor.get_positions():
@@ -121,9 +137,8 @@ def enhance_state(state):
                     has_position = True
                     break
             if not has_position:
-                trade_mgr.process_signal(state["pipeline"])
+                trade_mgr.process_signal(contrarian_signal)
             else:
-                # Pipeline ready but position exists → skip
                 pass
 
     enhanced_state = state
