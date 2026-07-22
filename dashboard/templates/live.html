@@ -513,22 +513,21 @@ if(cascade){
 }
 
 // ═══ SIGNAL ALERT ═══
-if(mech.ready&&mech.signal){
-  const sig=mech.signal;
-  const reasonsHtml=(sig.reasons||[]).map(r=>`<div style="font-size:10px;color:var(--text2)">• ${r}</div>`).join('');
-  $('signal-alert').innerHTML=`<div class="signal-alert signal-alert-${sig.direction.toLowerCase()}"><div class="signal-alert-title">🎯 ${sig.direction} SIGNAL</div><div class="signal-alert-details">R:R 1:${sig.rr} · SL ${fmt$(sig.stop_loss)} · TP ${fmt$(sig.target)}</div>${reasonsHtml}</div>`;
+if(sigData.ready&&sigData.signal){
+  const s=sigData.signal;
+  const reasonsHtml=(s.reasons||[]).map(r=>`<div style="font-size:10px;color:var(--text2)">• ${r}</div>`).join('');
+  const boost=s.realtime_boost?` · +${s.realtime_boost} RT boost`:'';
+  $('signal-alert').innerHTML=`<div class="signal-alert signal-alert-${s.direction.toLowerCase()}"><div class="signal-alert-title">🎯 ${s.direction} SIGNAL</div><div class="signal-alert-details">Score ${s.score}${boost} · R:R 1:${s.rr} · SL ${fmt$(s.stop_loss)} · TP ${fmt$(s.target)}</div>${reasonsHtml}</div>`;
 }else{$('signal-alert').innerHTML=''}
 
 // ═══ SETUPS ═══
-// Show mechanic signal setups if available
-const mechSig=mech.signal;
-if(mechSig){
-  const cls=mechSig.direction==='LONG'?'setup-long':'setup-short';
-  const dirColor=mechSig.direction==='LONG'?'var(--green)':'var(--red)';
-  $('setups').innerHTML=`<div class="setup ${cls}"><div class="setup-header"><div class="setup-dir" style="color:${dirColor}">${mechSig.direction==='LONG'?'🟢':'🔴'} ${mechSig.direction}</div><div class="setup-rr" style="background:${mechSig.direction==='LONG'?'var(--green-bg)':'var(--red-bg)'};color:${dirColor}">1:${mechSig.rr}</div></div><div class="setup-row"><span class="setup-row-label">Entry</span><span class="setup-row-value">${fmt$(mechSig.entry)}</span></div><div class="setup-row"><span class="setup-row-label">Stop Loss</span><span class="setup-row-value" style="color:var(--red)">${fmt$(mechSig.stop_loss)}</span></div><div class="setup-row"><span class="setup-row-label">Target</span><span class="setup-row-value" style="color:var(--green)">${fmt$(mechSig.target)}</span></div><div class="setup-row"><span class="setup-row-label">ATR</span><span class="setup-row-value">${fmt$(mechSig.atr)}</span></div><div class="setup-row"><span class="setup-row-label">Trail</span><span class="setup-row-value">${fmt$(mechSig.trail_distance)}</span></div><button class="btn ${mechSig.direction==='LONG'?'btn-long':'btn-short'} btn-block btn-sm" style="margin-top:6px" onclick="openTrade('${mechSig.direction}',${mechSig.stop_loss},${mechSig.target})">Execute ${mechSig.direction}</button></div>`;
+if(sigData.ready&&sigData.signal){
+  const s=sigData.signal;
+  const cls=s.direction==='LONG'?'setup-long':'setup-short';
+  const dirColor=s.direction==='LONG'?'var(--green)':'var(--red)';
+  $('setups').innerHTML=`<div class="setup ${cls}"><div class="setup-header"><div class="setup-dir" style="color:${dirColor}">${s.direction==='LONG'?'🟢':'🔴'} ${s.direction}</div><div class="setup-rr" style="background:${s.direction==='LONG'?'var(--green-bg)':'var(--red-bg)'};color:${dirColor}">1:${s.rr}</div></div><div class="setup-row"><span class="setup-row-label">Entry</span><span class="setup-row-value">${fmt$(s.entry)}</span></div><div class="setup-row"><span class="setup-row-label">Stop Loss</span><span class="setup-row-value" style="color:var(--red)">${fmt$(s.stop_loss)}</span></div><div class="setup-row"><span class="setup-row-label">Target</span><span class="setup-row-value" style="color:var(--green)">${fmt$(s.target)}</span></div><div class="setup-row"><span class="setup-row-label">ATR</span><span class="setup-row-value">${fmt$(s.atr)}</span></div><div class="setup-row"><span class="setup-row-label">Trail</span><span class="setup-row-value">${fmt$(s.trail_distance)}</span></div><button class="btn ${s.direction==='LONG'?'btn-long':'btn-short'} btn-block btn-sm" style="margin-top:6px" onclick="openTrade('${s.direction}',${s.stop_loss},${s.target})">Execute ${s.direction}</button></div>`;
 }else{
-  // Show long/short setups from mechanics if available
-  $('setups').innerHTML='<div style="color:var(--text3);font-size:11px;text-align:center;padding:8px">No setups forming</div>';
+  $('setups').innerHTML='<div style="color:var(--text3);font-size:11px;text-align:center;padding:8px">No signal yet — waiting for score ≥ 6</div>';
 }
 
 // ═══ BTC CORRELATION ═══
