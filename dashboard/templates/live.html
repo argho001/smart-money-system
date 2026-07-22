@@ -431,27 +431,47 @@ function render(d){
 const price=d.price||0;
 $('price').textContent=fmt$(price);
 
-// ═══ MECHANICS PIPELINE (PRIMARY) ═══
-const mech=d.mechanics||{};
+// ═══ SIGNAL (from simplified live_server.py) ═══
+const sigData=d.signal||{};
 const stage=$('pipeline-stage');
-stage.textContent=mech.stage||'...';
-if(mech.ready){stage.className='stage stage-ready'}
-else if(mech.direction){stage.className='stage stage-weak'}
+stage.textContent=sigData.stage||'...';
+if(sigData.ready){stage.className='stage stage-ready'}
+else if(sigData.direction){stage.className='stage stage-weak'}
 else{stage.className='stage stage-waiting'}
 
-// Mechanics checkpoints
-const cps=mech.checkpoints||[];
-$('cp-passed').textContent=cps.filter(c=>c.status==='PASS').length;
-$('cp-total').textContent=cps.length;
+// Signal info
+const score=sigData.score||0;
+const direction=sigData.direction;
 let cpHtml='';
-cps.forEach(cp=>{
-  let cls='cp-neutral';let icon='○';
-  if(cp.status==='PASS'){cls='cp-pass';icon='✓'}
-  else if(cp.status==='WEAK'){cls='cp-weak';icon='~'}
-  else if(cp.status==='BLOCK'){cls='cp-danger';icon='✕'}
-  cpHtml+=`<div class="cp"><div class="cp-icon ${cls}">${icon}</div><div class="cp-info"><div class="cp-name">${cp.name}</div><div class="cp-detail">${cp.detail}</div></div></div>`;
-});
-$('checkpoints').innerHTML=cpHtml||'<div style="color:var(--text3);font-size:11px;text-align:center">Initializing...</div>';
+if(direction){
+  const dirColor=direction==='LONG'?'var(--green)':'var(--red)';
+  const dirEmoji=direction==='LONG'?'🟢':'🔴';
+  cpHtml+=`<div class="cp"><div class="cp-icon cp-pass">✓</div><div class="cp-info"><div class="cp-name" style="color:${dirColor}">${dirEmoji} ${direction}</div><div class="cp-detail">Score: ${score}/6+</div></div></div>`;
+}
+if(sigData.signal&&sigData.signal.reasons){
+  sigData.signal.reasons.forEach(r=>{
+    cpHtml+=`<div class="cp"><div class="cp-icon cp-weak">~</div><div class="cp-info"><div class="cp-detail">${r}</div></div></div>`;
+  });
+}
+$('checkpoints').innerHTML=cpHtml||'<div style="color:var(--text3);font-size:11px;text-align:center">Waiting for signal...</div>';
+
+// Signal alert
+if(sigData.ready&&sigData.signal){
+  const s=sigData.signal;
+  const reasonsHtml=(s.reasons||[]).map(r=>`<div style="font-size:10px;color:var(--text2)">• ${r}</div>`).join('');
+  const boost=s.realtime_boost?` · +${s.realtime_boost} RT boost`:'';
+  $('signal-alert').innerHTML=`<div class="signal-alert signal-alert-${s.direction.toLowerCase()}"><div class="signal-alert-title">🎯 ${s.direction} SIGNAL</div><div class="signal-alert-details">Score ${s.score}${boost} · R:R 1:${s.rr} · SL ${fmt$(s.stop_loss)} · TP ${fmt$(s.target)}</div>${reasonsHtml}</div>`;
+}else{$('signal-alert').innerHTML=''}
+
+// Setups
+if(sigData.ready&&sigData.signal){
+  const s=sigData.signal;
+  const cls=s.direction==='LONG'?'setup-long':'setup-short';
+  const dirColor=s.direction==='LONG'?'var(--green)':'var(--red)';
+  $('setups').innerHTML=`<div class="setup ${cls}"><div class="setup-header"><div class="setup-dir" style="color:${dirColor}">${s.direction==='LONG'?'🟢':'🔴'} ${s.direction}</div><div class="setup-rr" style="background:${s.direction==='LONG'?'var(--green-bg)':'var(--red-bg)'};color:${dirColor}">1:${s.rr}</div></div><div class="setup-row"><span class="setup-row-label">Entry</span><span class="setup-row-value">${fmt$(s.entry)}</span></div><div class="setup-row"><span class="setup-row-label">Stop Loss</span><span class="setup-row-value" style="color:var(--red)">${fmt$(s.stop_loss)}</span></div><div class="setup-row"><span class="setup-row-label">Target</span><span class="setup-row-value" style="color:var(--green)">${fmt$(s.target)}</span></div><div class="setup-row"><span class="setup-row-label">ATR</span><span class="setup-row-value">${fmt$(s.atr)}</span></div><div class="setup-row"><span class="setup-row-label">Trail</span><span class="setup-row-value">${fmt$(s.trail_distance)}</span></div><button class="btn ${s.direction==='LONG'?'btn-long':'btn-short'} btn-block btn-sm" style="margin-top:6px" onclick="openTrade('${s.direction}',${s.stop_loss},${s.target})">Execute ${s.direction}</button></div>`;
+}else{
+  $('setups').innerHTML='<div style="color:var(--text3);font-size:11px;text-align:center;padding:8px">No signal yet — waiting for score ≥ 6</div>';
+}
 
 // ═══ WYCKOFF PHASE ═══
 const wyck=d.wyckoff||{};
@@ -520,13 +540,12 @@ $('btc-chg-15m').textContent=(btc.btc_change_15m>=0?'+':'')+btc.btc_change_15m?.
 $('btc-chg-15m').style.color=clr(btc.btc_change_15m);
 $('eth-btc-ratio').textContent=btc.eth_btc_ratio?.toFixed(6)||'0';
 const btcAgree=$('btc-agreement');
-// Get agreement from mechanics checkpoints
-const btcCp=cps.find(c=>c.name==='BTC');
-if(btcCp){
-  if(btcCp.status==='PASS'){btcAgree.textContent='✅ Agree';btcAgree.className='card-badge badge-green'}
-  else if(btcCp.status==='BLOCK'){btcAgree.textContent='❌ Disagree';btcAgree.className='card-badge badge-red'}
+if(sigData.signal&&sigData.signal.reasons){
+  const btcReason=sigData.signal.reasons.find(r=>r.includes('BTC'));
+  if(btcReason&&btcReason.includes('confirming')){btcAgree.textContent='✅ Agree';btcAgree.className='card-badge badge-green'}
+  else if(btcReason&&btcReason.includes('diverges')){btcAgree.textContent='❌ Disagree';btcAgree.className='card-badge badge-red'}
   else{btcAgree.textContent='⚪ Neutral';btcAgree.className='card-badge'}
-  $('btc-detail').textContent=btcCp.detail;
+  $('btc-detail').textContent=btcReason||'';
 }else{btcAgree.textContent='--';$('btc-detail').textContent=''}
 
 // ═══ LIQUIDATION HEATMAP ═══
