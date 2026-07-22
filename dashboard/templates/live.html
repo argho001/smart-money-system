@@ -539,55 +539,22 @@ function toggleAuto(){
     body:JSON.stringify({})}).then(r=>r.json()).then(d=>{console.log('Auto:',d)});
 }
 function setLeverage(lev){
-function downloadData(){
-  fetch("/api/export").then(r=>r.json()).then(d=>{
-    const blob=new Blob([JSON.stringify(d,null,2)],{type:"application/json"});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement("a");
-    a.href=url;a.download="smart_money_trades_"+new Date().toISOString().slice(0,10)+".json";
-    a.click();URL.revokeObjectURL(url);
-  });
-}
   fetch('/api/trade/leverage',{method:'POST',headers:{'Content-Type':'application/json'},
-function downloadData(){
-  fetch("/api/export").then(r=>r.json()).then(d=>{
-    const blob=new Blob([JSON.stringify(d,null,2)],{type:"application/json"});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement("a");
-    a.href=url;a.download="smart_money_trades_"+new Date().toISOString().slice(0,10)+".json";
-    a.click();URL.revokeObjectURL(url);
-  });
-}
     body:JSON.stringify({leverage:parseInt(lev)})}).then(r=>r.json()).then(d=>{console.log('Lev:',d)});
-function downloadData(){
-  fetch("/api/export").then(r=>r.json()).then(d=>{
-    const blob=new Blob([JSON.stringify(d,null,2)],{type:"application/json"});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement("a");
-    a.href=url;a.download="smart_money_trades_"+new Date().toISOString().slice(0,10)+".json";
-    a.click();URL.revokeObjectURL(url);
-  });
 }
-}
+
 function downloadData(){
-  fetch("/api/export").then(r=>r.json()).then(d=>{
-    const blob=new Blob([JSON.stringify(d,null,2)],{type:"application/json"});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement("a");
-    a.href=url;a.download="smart_money_trades_"+new Date().toISOString().slice(0,10)+".json";
-    a.click();URL.revokeObjectURL(url);
+  fetch('/api/export').then(function(r){return r.json()}).then(function(d){
+    var blob=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;
+    a.download='smart_money_trades_'+new Date().toISOString().slice(0,10)+'.json';
+    a.click();
+    URL.revokeObjectURL(url);
   });
 }
 </script>
 </body>
 </html>
 
-function downloadData(){
-  fetch('/api/export').then(r=>r.json()).then(d=>{
-    const blob=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url;a.download='smart_money_trades_'+new Date().toISOString().slice(0,10)+'.json';
-    a.click();URL.revokeObjectURL(url);
-  });
-}
