@@ -23,6 +23,10 @@ from modules.live.contrarian_pipeline import ContrarianPipeline
 from modules.live.atr_engine import ATREngine
 from modules.live.btc_correlation import BTCCorrelation
 from modules.live.session_filter import SessionFilter
+from modules.live.liquidation_heatmap import LiquidationHeatmap
+from modules.live.liquidity_sweep import LiquiditySweepDetector
+from modules.live.wyckoff_detector import WyckoffPhase
+from modules.live.mechanics_pipeline import MechanicsPipeline
 from modules.live.cvd_engine import CVDEngine
 from modules.live.oi_delta import OIDeltaTracker
 from modules.live.liquidation_clusters import LiquidationClusters
@@ -42,6 +46,10 @@ contrarian = ContrarianPipeline()
 atr = ATREngine(period=14)
 btc_corr = BTCCorrelation()
 session_filter = SessionFilter()
+liq_heatmap = LiquidationHeatmap()
+sweep_detector = LiquiditySweepDetector()
+wyckoff = WyckoffPhase()
+mechanics = MechanicsPipeline()
 cvd = CVDEngine()
 oi_delta = OIDeltaTracker()
 liq_clusters = LiquidationClusters()
@@ -124,14 +132,33 @@ def enhance_state(state):
     # Pipeline v3 (legacy — still available)
     state["pipeline"] = pipeline.evaluate(state)
 
-    # Contrarian Pipeline v4 (new — primary signal)
+    # Contrarian Pipeline v4 (legacy — still available)
     state["contrarian"] = contrarian.evaluate(state, atr, btc_engine=btc_corr, session_filter=session_filter)
+    
+    # Mechanics Pipeline v5 (new — based on how market actually works)
+    state["mechanics"] = mechanics.evaluate(
+        state, atr,
+        btc_engine=btc_corr,
+        session_filter=session_filter,
+        liq_heatmap=liq_heatmap,
+        sweep_detector=sweep_detector,
+        wyckoff=wyckoff
+    )
     
     # BTC context
     state["btc"] = btc_corr.get_state()
     
     # Session info
     state["session"] = session_filter.get_session()
+    
+    # Liquidation heatmap
+    state["liquidation"] = liq_heatmap.get_state()
+    
+    # Wyckoff phase
+    state["wyckoff"] = wyckoff.get_state()
+    
+    # Liquidity sweep
+    state["sweep"] = sweep_detector.get_state()
 
     # ATR state
     state["atr"] = atr.get_state()
@@ -139,9 +166,9 @@ def enhance_state(state):
     # Trade status
     if trade_mgr:
         state["trade_status"] = trade_mgr.get_formatted_status()
-        # Auto-execute with CONTRARIAN signals (not legacy pipeline)
-        contrarian_signal = state.get("contrarian", {})
-        if trade_mgr.auto_trade and contrarian_signal.get("ready"):
+        # Auto-execute with MECHANICS pipeline (v5) — primary signal
+        mech_signal = state.get("mechanics", {})
+        if trade_mgr.auto_trade and mech_signal.get("ready"):
             # Check if there's already an open position
             has_position = False
             for pos in trade_mgr.executor.get_positions():
@@ -149,7 +176,7 @@ def enhance_state(state):
                     has_position = True
                     break
             if not has_position:
-                trade_mgr.process_signal(contrarian_signal)
+                trade_mgr.process_signal(mech_signal)
             else:
                 pass
 
@@ -302,7 +329,7 @@ def start_engine():
 
         _engine_ready = True
         print("[ENGINE] Ready")
-        await asyncio.gather(engine.start(), oi_loop(), btc_corr.start())
+        await asyncio.gather(engine.start(), oi_loop(), btc_corr.start(), liq_heatmap.start(aiohttp.ClientSession()))
 
     try:
         loop.run_until_complete(run_all())
