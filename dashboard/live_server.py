@@ -21,6 +21,8 @@ from modules.live.entry_exit_engine import EntryExitEngine
 from modules.live.signal_pipeline import SignalPipeline
 from modules.live.contrarian_pipeline import ContrarianPipeline
 from modules.live.atr_engine import ATREngine
+from modules.live.btc_correlation import BTCCorrelation
+from modules.live.session_filter import SessionFilter
 from modules.live.cvd_engine import CVDEngine
 from modules.live.oi_delta import OIDeltaTracker
 from modules.live.liquidation_clusters import LiquidationClusters
@@ -38,6 +40,8 @@ entry_exit = EntryExitEngine()
 pipeline = SignalPipeline()
 contrarian = ContrarianPipeline()
 atr = ATREngine(period=14)
+btc_corr = BTCCorrelation()
+session_filter = SessionFilter()
 cvd = CVDEngine()
 oi_delta = OIDeltaTracker()
 liq_clusters = LiquidationClusters()
@@ -74,6 +78,8 @@ def enhance_state(state):
     price = state.get("price", 0)
     if price > 0:
         atr.update(price)
+        # Update BTC correlation with ETH price
+        btc_corr.update_eth_price(price)
 
     # CVD
     trades = list(engine._last_trades)[-100:]
@@ -119,7 +125,13 @@ def enhance_state(state):
     state["pipeline"] = pipeline.evaluate(state)
 
     # Contrarian Pipeline v4 (new — primary signal)
-    state["contrarian"] = contrarian.evaluate(state, atr)
+    state["contrarian"] = contrarian.evaluate(state, atr, btc_engine=btc_corr, session_filter=session_filter)
+    
+    # BTC context
+    state["btc"] = btc_corr.get_state()
+    
+    # Session info
+    state["session"] = session_filter.get_session()
 
     # ATR state
     state["atr"] = atr.get_state()
@@ -290,7 +302,7 @@ def start_engine():
 
         _engine_ready = True
         print("[ENGINE] Ready")
-        await asyncio.gather(engine.start(), oi_loop())
+        await asyncio.gather(engine.start(), oi_loop(), btc_corr.start())
 
     try:
         loop.run_until_complete(run_all())

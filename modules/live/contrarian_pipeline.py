@@ -29,9 +29,9 @@ class ContrarianPipeline:
         # Track recent signals for win rate estimation
         self.signal_history = deque(maxlen=100)
 
-    def evaluate(self, state, atr_engine):
+    def evaluate(self, state, atr_engine, btc_engine=None, session_filter=None):
         """
-        Evaluate contrarian signals.
+        Evaluate contrarian signals with BTC correlation and session context.
         Returns signal dict or None.
         """
         now = time.time()
@@ -41,6 +41,89 @@ class ContrarianPipeline:
 
         checkpoints = []
 
+        # ═══════════════════════════════════════════════════════
+        # CHECKPOINT -2: SESSION FILTER — When are we trading?
+        # Low-liquidity hours = noise, not signal
+        # ═══════════════════════════════════════════════════════
+        session_info = session_filter.get_session() if session_filter else None
+        session_quality = session_info.get("quality_raw", "medium") if session_info else "medium"
+        session_confidence = session_info.get("confidence_mult", 0.7) if session_info else 0.7
+        
+        if session_quality == "high":
+            checkpoints.append({
+                "name": "SESSION",
+                "status": "PASS",
+                "detail": f"🟢 {session_info['session']} session — high quality, moves have follow-through",
+                "score": 2,
+                "direction": None,  # Doesn't give direction, gives quality
+                "type": "context",
+                "weight": "medium",
+            })
+        elif session_quality == "medium":
+            checkpoints.append({
+                "name": "SESSION",
+                "status": "WEAK",
+                "detail": f"🟡 {session_info['session']} session — medium quality, reduce confidence",
+                "score": 0,
+                "direction": None,
+                "type": "context",
+                "weight": "light",
+            })
+        else:
+            checkpoints.append({
+                "name": "SESSION",
+                "status": "NEUTRAL",
+                "detail": f"🔴 {session_info['session']} session — low quality, avoid trading",
+                "score": -2,
+                "direction": None,
+                "type": "context",
+                "weight": "heavy",
+            })
+
+        # ═══════════════════════════════════════════════════════
+        # CHECKPOINT -1: BTC CORRELATION — Is BTC on our side?
+        # BTC leads, ETH follows. If BTC disagrees with our signal, don't trade.
+        # ═══════════════════════════════════════════════════════
+        if btc_engine:
+            # Calculate ETH 5m change for comparison
+            mtf = state.get("mtf", {})
+            mtf_5m = mtf.get("5m", {})
+            eth_buy_pct = mtf_5m.get("buy_pct", 50)
+            eth_change_5m = (eth_buy_pct - 50) / 50 * 0.5  # Rough approximation
+            
+            btc_ctx = btc_engine.get_btc_context(eth_change_5m)
+            
+            if btc_ctx["agreement"] == "AGREE":
+                checkpoints.append({
+                    "name": "BTC",
+                    "status": "PASS",
+                    "detail": f"🟢 {btc_ctx['detail']}",
+                    "score": 3,
+                    "direction": btc_ctx["btc_direction"],
+                    "type": "context",
+                    "weight": "heavy",
+                })
+            elif btc_ctx["agreement"] == "DISAGREE":
+                checkpoints.append({
+                    "name": "BTC",
+                    "status": "BLOCK",
+                    "detail": f"🔴 {btc_ctx['detail']}",
+                    "score": -3,
+                    "direction": None,
+                    "type": "context",
+                    "weight": "heavy",
+                })
+            else:
+                checkpoints.append({
+                    "name": "BTC",
+                    "status": "NEUTRAL",
+                    "detail": f"⚪ {btc_ctx['detail']}",
+                    "score": 0,
+                    "direction": None,
+                    "type": "context",
+                    "weight": "light",
+                })
+        
         # ═══════════════════════════════════════════════════════
         # CHECKPOINT 0: HIGHER TIMEFRAME TREND FILTER
         # Only trade in the direction of the 15m+ trend
@@ -479,13 +562,33 @@ class ContrarianPipeline:
         else:
             direction = raw_direction
 
+        # ═══ BTC CORRELATION BLOCK ═══
+        # If BTC disagrees with our direction → block
+        btc_blocked = False
+        btc_cp = next((cp for cp in checkpoints if cp.get("name") == "BTC"), None)
+        if btc_cp and btc_cp["status"] == "BLOCK":
+            btc_blocked = True
+            direction = None
+
+        # ═══ SESSION FILTER ═══
+        # Low quality session → reduce confidence or block
+        session_blocked = False
+        session_cp = next((cp for cp in checkpoints if cp.get("name") == "SESSION"), None)
+        if session_cp and session_cp["score"] < 0:
+            # Low quality session → block if score is negative enough
+            if session_cp["score"] <= -2:
+                session_blocked = True
+                direction = None
+
         # ═══════════════════════════════════════════════════════
         # SIGNAL GENERATION
         # ═══════════════════════════════════════════════════════
-        # Need: direction WITH trend + at least 1 contrarian PASS + at level OR 2 contrarian PASS
+        # Need: direction WITH trend + WITH BTC + good session + contrarian signal
         can_signal = (
             direction
             and not trend_blocked
+            and not btc_blocked
+            and not session_blocked
             and (contrarian_passed >= 2 or (contrarian_passed >= 1 and level_signal))
             and (now - self.last_signal_time > self.cooldown)
         )
@@ -508,16 +611,20 @@ class ContrarianPipeline:
         short_setup = self._build_setup(state, "SHORT", checkpoints, atr_engine) if atr_engine else None
 
         # Stage
-        if trend_blocked:
+        if session_blocked:
+            stage = f"🛑 SESSION BLOCKED — {session_info.get('session', 'unknown')} session too low quality"
+        elif btc_blocked:
+            stage = f"🛑 BTC DISAGREES — {btc_cp['detail']}"
+        elif trend_blocked:
             stage = f"🛑 TREND BLOCKED — contrarian {raw_direction} but trend is {trend_dir}"
         elif not direction:
             stage = "⏳ WAITING — no contrarian signal"
         elif contrarian_passed == 0:
             stage = "🔍 SCANNING — need contrarian confirmation"
         elif contrarian_passed >= 1 and level_signal:
-            stage = "🟢 AT LEVEL + CONTRARIAN + TREND — best setup"
+            stage = "🟢 AT LEVEL + CONTRARIAN + TREND + BTC — best setup"
         elif contrarian_passed >= 2:
-            stage = "🟢 MULTIPLE CONTRARIANS + TREND — strong setup"
+            stage = "🟢 MULTIPLE CONTRARIANS + TREND + BTC — strong setup"
         elif not ready:
             stage = "⏳ COOLDOWN"
         else:
