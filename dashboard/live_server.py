@@ -330,11 +330,13 @@ if __name__ == "__main__":
     engine_thread = threading.Thread(target=start_engine, daemon=True)
     engine_thread.start()
 
-    print(f"\nDashboard: http://localhost:8888")
+    print(f"\nDashboard: http://localhost:{os.environ.get('PORT', 8888)}")
     print("=" * 60)
 
-    # Start Flask immediately — don't block on engine startup
-    app.run(host="0.0.0.0", port=8888, debug=False, threaded=True)
+    # Railway sets PORT env var — use it, fallback to 8888
+    port = int(os.environ.get("PORT", 8888))
+    print(f"Listening on port {port}")
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
 
 
 
