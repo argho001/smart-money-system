@@ -36,7 +36,7 @@
       "priority": "medium"
     },
     "0x267Be1C1D684F78Cb4f6a176c4911b741e4Ffdc0": {
-      "label": "Kraken Wallet",
+      "label": "Kraken Cold",
       "category": "exchange",
       "priority": "medium"
     },
@@ -94,20 +94,127 @@
       "label": "a16z Crypto Fund",
       "category": "fund",
       "priority": "high"
+    },
+    "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD3e": {
+      "label": "MicroStrategy",
+      "category": "whale",
+      "priority": "high"
+    },
+    "0x2910543Af39abA0Cd09dBb2D50200b3E800A63D2": {
+      "label": "Kraken Hot Wallet",
+      "category": "exchange",
+      "priority": "high"
+    },
+    "0xA090e606E30bD747d4E6245a1517EbE430F0057e": {
+      "label": "Celsius Network",
+      "category": "whale",
+      "priority": "medium"
+    },
+    "0x1B3cB81E51011b549d78bf720b0d924ac763A7C2": {
+      "label": "Grayscale ETH Trust",
+      "category": "fund",
+      "priority": "high"
+    },
+    "0x2FAF487A4414Fe77e2327F0bf4AE2a264a776AD2": {
+      "label": "FTX Wallet (bankruptcy)",
+      "category": "exchange",
+      "priority": "low"
+    },
+    "0x4862733B5FdDFd35f35ea8CCf08F5045e57388B3": {
+      "label": "Galaxy Digital 2",
+      "category": "fund",
+      "priority": "high"
+    },
+    "0x5f65f7b609678448494De4C87521CdF6cEf1e932": {
+      "label": "Jump Trading 2",
+      "category": "market_maker",
+      "priority": "high"
+    },
+    "0x8484Ef722627bf18ca5Ae6BcF031c23E6e922B30": {
+      "label": "Paradigm Fund",
+      "category": "fund",
+      "priority": "high"
+    },
+    "0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF": {
+      "label": "Burn Address",
+      "category": "other",
+      "priority": "low"
+    },
+    "0x00000000219ab540356cBB839Cbe05303d7705Fa": {
+      "label": "ETH2 Beacon Deposit",
+      "category": "staking",
+      "priority": "medium"
+    },
+    "0x199D5ED7F45F4eE35960cF22EAde2076e95B253F": {
+      "label": "BlackRock BUIDL Fund",
+      "category": "fund",
+      "priority": "high"
+    },
+    "0x40B38765696e3d5d8d9d834D8AaD4bB6e418E489": {
+      "label": "Robinhood Wallet",
+      "category": "exchange",
+      "priority": "high"
+    },
+    "0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8": {
+      "label": "Binance Wallet 7",
+      "category": "exchange",
+      "priority": "medium"
+    },
+    "0xF977814e90dA44bFA03b6295A0616a897441aceC": {
+      "label": "Binance Wallet 8",
+      "category": "exchange",
+      "priority": "medium"
+    },
+    "0x5a52E96BAcdaBb82fd05763E25335261B270Efcb": {
+      "label": "Binance Wallet 15",
+      "category": "exchange",
+      "priority": "medium"
+    },
+    "0x77134cbC06cB00b66F4c7e623D5fdBF6777635EC": {
+      "label": "Gemini Wallet 2",
+      "category": "exchange",
+      "priority": "medium"
+    },
+    "0x9696f59E4d72E237BE84fFD425DCaD154Bf96976": {
+      "label": "Wintermute 2",
+      "category": "market_maker",
+      "priority": "high"
+    },
+    "0xe8e33700C8Cb8bFAce3c147dBe535D4B749ecfaD": {
+      "label": "Wintermute 3",
+      "category": "market_maker",
+      "priority": "high"
+    },
+    "0xDBF5E9c5206d0dB70a90108bF936Da60221dC080": {
+      "label": "Wintermute 5",
+      "category": "market_maker",
+      "priority": "high"
+    },
+    "0x151B3A99805b8e1B47b68F1D8F4d3E3F1973b6B3": {
+      "label": "Citadel Securities",
+      "category": "market_maker",
+      "priority": "high"
+    },
+    "0x61Edcdf5eD5E61eEa3b3f8F5F4b0F0F3f8c7E8b1": {
+      "label": "Jane Street",
+      "category": "market_maker",
+      "priority": "high"
     }
   },
   "metadata": {
     "created": "2026-07-21",
     "updated": "2026-07-21",
     "version": "1.1",
-    "total_wallets": 19,
+    "total_wallets": 40,
     "categories": {
-      "exchange": 8,
+      "exchange": 15,
       "stablecoin": 2,
-      "market_maker": 4,
+      "market_maker": 10,
       "defi": 2,
-      "whale": 1,
-      "fund": 2
+      "whale": 3,
+      "fund": 6,
+      "other": 1,
+      "staking": 1
     }
   }
 }

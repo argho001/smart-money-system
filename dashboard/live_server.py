@@ -1,6 +1,6 @@
 """
-Smart Money System - Live Dashboard Server v3
-All engines integrated: CVD, OI Delta, Liquidation Clusters, VPIN, Cross-exchange OI.
+Smart Money System - Live Dashboard Server v4
+Trading terminal: signals + execution + tracking
 """
 import asyncio
 import json
@@ -11,14 +11,13 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 from flask_sock import Sock
 from modules.live.live_engine import LiveDataEngine
 from modules.live.anomaly_detector import AnomalyDetector
 from modules.live.outcome_tracker import OutcomeTracker
 from modules.live.entry_exit_engine import EntryExitEngine
 from modules.live.signal_pipeline import SignalPipeline
-from modules.live.signal_pipeline_v2 import SignalPipelineV2
 from modules.live.cvd_engine import CVDEngine
 from modules.live.oi_delta import OIDeltaTracker
 from modules.live.liquidation_clusters import LiquidationClusters
@@ -28,36 +27,50 @@ from modules.live.cross_exchange_oi import CrossExchangeOI
 app = Flask(__name__)
 sock = Sock(app)
 
-# All engines
+# Core engines
 engine = LiveDataEngine()
 anomaly = AnomalyDetector()
 outcome = OutcomeTracker()
 entry_exit = EntryExitEngine()
 pipeline = SignalPipeline()
-pipeline_v2 = SignalPipelineV2()
 cvd = CVDEngine()
 oi_delta = OIDeltaTracker()
 liq_clusters = LiquidationClusters()
 vpin = VpineEngine()
 cross_oi = CrossExchangeOI()
 
+# Trade Manager
+trade_mgr = None
+try:
+    from config import settings
+    if hasattr(settings, 'BINANCE_API_KEY') and settings.BINANCE_API_KEY:
+        from modules.live.trade_manager import TradeManager
+        trade_mgr = TradeManager(
+            api_key=settings.BINANCE_API_KEY,
+            api_secret=settings.BINANCE_API_SECRET,
+            base_url=getattr(settings, 'BINANCE_FUTURES_DEMO_URL', 'https://demo-fapi.binance.com'),
+            config={"usdt_per_trade": 100, "leverage": 5, "auto_trade": False, "cooldown": 300, "risk_pct": 2.0}
+        )
+        print("[TRADE] Binance executor connected")
+    else:
+        print("[TRADE] No Binance keys — execution disabled")
+except Exception as e:
+    print(f"[TRADE] Init failed: {e}")
+
 enhanced_state = {}
 _oi_fetch_counter = 0
 
 
 def enhance_state(state):
-    """Add all enhanced data to state"""
     global enhanced_state, _oi_fetch_counter
 
-    # CVD — update from trade buffer
-    trades = list(engine._last_trades)[-100:]  # Last 100 trades
+    # CVD
+    trades = list(engine._last_trades)[-100:]
     cvd.update(trades)
     state["cvd"] = cvd.get_state()
 
-    # Liquidation clusters — update from order book
-    bids = []
-    asks = []
-    # Reconstruct order book from state
+    # Liquidation clusters
+    bids, asks = [], []
     for l in state.get("support_levels", []):
         bids.append([str(l["price"]), str(l.get("strength", 1))])
     for l in state.get("resistance_levels", []):
@@ -65,25 +78,24 @@ def enhance_state(state):
     liq_clusters.update(state.get("price", 0), bids, asks, state.get("funding_rate", 0))
     state["liq_clusters"] = liq_clusters.get_state(state.get("price", 0))
 
-    # VPIN — update from trades
+    # VPIN
     vpin.update(trades)
     state["vpin"] = vpin.get_state()
 
-    # Anomaly detection
+    # Anomaly
     alerts = anomaly.update(state)
     state["anomaly_alerts"] = [
         {"severity": a["severity"], "label": a["label"], "current": a["current"],
-         "z_score": a["z_score"], "direction": a["direction"]}
-        for a in alerts
+         "z_score": a["z_score"], "direction": a["direction"]} for a in alerts
     ]
 
-    # Outcome tracking
+    # Outcome
     outcome.log_state(state)
     outcome.check_outcomes(state.get("price", 0))
     outlook = outcome.get_current_setup_outlook(state)
     state["setup_outlook"] = outlook
 
-    # Entry/Exit signal
+    # Entry/Exit
     signal = entry_exit.evaluate(state, outlook)
     if signal:
         state["trade_signal"] = signal
@@ -92,47 +104,25 @@ def enhance_state(state):
     else:
         state["trade_signal"] = None
 
-    # Signal Pipeline (v1 for backward compat)
+    # Pipeline v3
     state["pipeline"] = pipeline.evaluate(state)
 
-    # Signal Pipeline v2 (proven signals only)
-    # We need candle data — fetch from engine's cached data
-    try:
-        import json, os
-        candle_file = "data/candles/ETHUSDT_1m_90d.json"
-        c1m = []
-        if os.path.exists(candle_file):
-            with open(candle_file) as f:
-                raw = json.load(f)
-                c1m = [{"close": c["close"], "high": c["high"], "low": c["low"], "volume": c["volume"]} for c in raw[-3600:]]
-
-        candle_file_5m = "data/candles/ETHUSDT_5m_90d.json"
-        c5m = []
-        if os.path.exists(candle_file_5m):
-            with open(candle_file_5m) as f:
-                raw = json.load(f)
-                c5m = [{"close": c["close"], "high": c["high"], "low": c["low"], "volume": c["volume"]} for c in raw[-200:]]
-
-        candle_file_15m = "data/candles/ETHUSDT_15m_90d.json"
-        c15m = []
-        if os.path.exists(candle_file_15m):
-            with open(candle_file_15m) as f:
-                raw = json.load(f)
-                c15m = [{"close": c["close"], "high": c["high"], "low": c["low"], "volume": c["volume"]} for c in raw[-200:]]
-
-        candle_file_1h = "data/candles/ETHUSDT_1h_90d.json"
-        c1h = []
-        if os.path.exists(candle_file_1h):
-            with open(candle_file_1h) as f:
-                raw = json.load(f)
-                c1h = [{"close": c["close"], "high": c["high"], "low": c["low"], "volume": c["volume"]} for c in raw[-200:]]
-
-        if c1m:
-            state["pipeline_v2"] = pipeline_v2.evaluate(c1m, c5m, c15m, c1h)
-        else:
-            state["pipeline_v2"] = pipeline_v2._empty("No candle data")
-    except Exception as e:
-        state["pipeline_v2"] = pipeline_v2._empty(str(e))
+    # Trade status
+    if trade_mgr:
+        state["trade_status"] = trade_mgr.get_formatted_status()
+        # Auto-execute ONLY if no open position
+        if trade_mgr.auto_trade and state["pipeline"].get("ready"):
+            # Check if there's already an open position
+            has_position = False
+            for pos in trade_mgr.executor.get_positions():
+                if pos["symbol"] == trade_mgr.executor.symbol:
+                    has_position = True
+                    break
+            if not has_position:
+                trade_mgr.process_signal(state["pipeline"])
+            else:
+                # Pipeline ready but position exists → skip
+                pass
 
     enhanced_state = state
     return state
@@ -158,6 +148,81 @@ def api_outcomes():
     return jsonify(outcome.get_setup_stats())
 
 
+# ═══════════════════════════════════════════
+# TRADE API
+# ═══════════════════════════════════════════
+
+@app.route("/api/trade/status")
+def api_trade_status():
+    if trade_mgr:
+        return jsonify(trade_mgr.get_formatted_status())
+    return jsonify({"error": "Not connected"})
+
+
+@app.route("/api/trade/open", methods=["POST"])
+def api_trade_open():
+    if not trade_mgr:
+        return jsonify({"error": "Not connected"}), 400
+    data = request.json or {}
+    direction = data.get("direction", "LONG")
+    sl = data.get("sl", 0)
+    tp = data.get("tp", 0)
+    usdt = data.get("usdt", trade_mgr.usdt_per_trade)
+    result = trade_mgr.executor.execute_signal(direction, sl, tp, usdt)
+    if result.get("success") and sl and tp:
+        # Register SL/TP for monitoring
+        trade_mgr.register_manual_stop(direction, sl, tp, data.get("entry", 0))
+    return jsonify(result)
+
+
+@app.route("/api/trade/close", methods=["POST"])
+def api_trade_close():
+    if not trade_mgr:
+        return jsonify({"error": "Not connected"}), 400
+    data = request.json or {}
+    direction = data.get("direction")
+    result = trade_mgr.close_position(direction)
+    return jsonify(result)
+
+
+@app.route("/api/trade/close-all", methods=["POST"])
+def api_trade_close_all():
+    if not trade_mgr:
+        return jsonify({"error": "Not connected"}), 400
+    result = trade_mgr.close_position()
+    return jsonify(result)
+
+
+@app.route("/api/trade/auto", methods=["POST"])
+def api_trade_auto():
+    if not trade_mgr:
+        return jsonify({"error": "Not connected"}), 400
+    data = request.json or {}
+    enabled = data.get("enabled", not trade_mgr.auto_trade)
+    trade_mgr.toggle_auto_trade(enabled)
+    return jsonify({"auto_trade": trade_mgr.auto_trade})
+
+
+@app.route("/api/trade/leverage", methods=["POST"])
+def api_trade_leverage():
+    if not trade_mgr:
+        return jsonify({"error": "Not connected"}), 400
+    data = request.json or {}
+    lev = data.get("leverage", 5)
+    trade_mgr.set_leverage(lev)
+    return jsonify({"leverage": lev})
+
+
+@app.route("/api/trade/amount", methods=["POST"])
+def api_trade_amount():
+    if not trade_mgr:
+        return jsonify({"error": "Not connected"}), 400
+    data = request.json or {}
+    usdt = data.get("usdt", 100)
+    trade_mgr.set_amount(usdt)
+    return jsonify({"usdt_per_trade": usdt})
+
+
 @sock.route("/ws")
 def ws_handler(ws):
     loop = asyncio.new_event_loop()
@@ -175,15 +240,12 @@ def ws_handler(ws):
 
 
 def start_engine():
-    """Start all engines"""
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
     async def run_all():
-        # Start main engine with enhancement callback
         engine.on_update(lambda s: enhance_state(s))
 
-        # Start OI and cross-exchange polling in parallel
         async def oi_loop():
             global _oi_fetch_counter
             session = __import__("aiohttp").ClientSession()
@@ -191,8 +253,6 @@ def start_engine():
                 try:
                     await oi_delta.fetch(session)
                     await cross_oi.fetch(session)
-
-                    # Merge OI data into enhanced state
                     oi_state = oi_delta.get_signal(enhanced_state.get("price", 0))
                     enhanced_state["oi_delta"] = oi_state
                     enhanced_state["cross_oi"] = cross_oi.get_state()
@@ -200,31 +260,52 @@ def start_engine():
                     pass
                 await asyncio.sleep(5)
 
-        # Run both
-        await asyncio.gather(
-            engine.start(),
-            oi_loop(),
-        )
+        await asyncio.gather(engine.start(), oi_loop())
 
     loop.run_until_complete(run_all())
 
 
+
+
+@app.route("/api/export")
+def api_export():
+    """Export all trade data for analysis."""
+    import os
+    data = {
+        "exported_at": datetime.now().isoformat(),
+        "trade_log": [],
+        "paper_signals": [],
+        "stats": {},
+    }
+    try:
+        with open("data/trades/trade_log.json") as f:
+            data["trade_log"] = json.load(f)
+    except:
+        pass
+    try:
+        with open("data/paper_trades/signals.jsonl") as f:
+            data["paper_signals"] = [json.loads(l) for l in f if l.strip()]
+    except:
+        pass
+    if trade_mgr:
+        data["stats"] = trade_mgr.get_formatted_status()
+    return jsonify(data)
 if __name__ == "__main__":
     import threading
 
     print("=" * 60)
-    print("SMART MONEY — LIVE TERMINAL v3")
+    print("SMART MONEY — LIVE TERMINAL v4")
     print("=" * 60)
     print("Components:")
     print("  ✅ Live data engine")
     print("  ✅ CVD (Cumulative Volume Delta)")
     print("  ✅ OI Delta tracker")
     print("  ✅ Liquidation clusters")
-    print("  ✅ VPIN (toxic flow)")
     print("  ✅ Cross-exchange OI rotation")
     print("  ✅ Anomaly detector")
-    print("  ✅ Outcome tracker")
-    print("  ✅ Entry/exit engine")
+    print("  ✅ Signal Pipeline v3 (5 checkpoints)")
+    print(f"  {'✅' if trade_mgr else '❌'} Trade executor {'(' + str(trade_mgr.leverage) + 'x leverage)' if trade_mgr else ''}")
+    print(f"  {'✅' if trade_mgr else '❌'} Auto-trade {'ON' if trade_mgr and trade_mgr.auto_trade else 'OFF'}")
     print("Starting...")
 
     engine_thread = threading.Thread(target=start_engine, daemon=True)
@@ -235,3 +316,31 @@ if __name__ == "__main__":
     print("=" * 60)
 
     app.run(host="0.0.0.0", port=8888, debug=False, threaded=True)
+
+
+@app.route("/api/export")
+def api_export():
+    """Export all trade data for analysis."""
+    import os
+    data = {
+        "exported_at": datetime.now().isoformat(),
+        "trade_log": [],
+        "paper_signals": [],
+        "stats": {},
+    }
+    # Trade log
+    try:
+        with open("data/trades/trade_log.json") as f:
+            data["trade_log"] = json.load(f)
+    except:
+        pass
+    # Paper signals
+    try:
+        with open("data/paper_trades/signals.jsonl") as f:
+            data["paper_signals"] = [json.loads(l) for l in f if l.strip()]
+    except:
+        pass
+    # Stats
+    if trade_mgr:
+        data["stats"] = trade_mgr.get_formatted_status()
+    return jsonify(data)

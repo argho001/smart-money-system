@@ -1,0 +1,7 @@
+__pycache__
+*.pyc
+.git
+.env
+data/candles/
+data/mega_backtest_results.json
+data/multi_coin_validation.json
