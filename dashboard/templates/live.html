@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Smart Money Terminal</title>
+<title>Smart Money Terminal — Market Mechanics v5</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 :root{
@@ -13,13 +13,13 @@
   --green:#22c55e;--green2:#16a34a;--green-bg:rgba(34,197,94,.08);--green-border:rgba(34,197,94,.2);
   --red:#ef4444;--red2:#dc2626;--red-bg:rgba(239,68,68,.08);--red-border:rgba(239,68,68,.2);
   --yellow:#eab308;--yellow-bg:rgba(234,179,8,.08);
-  --blue:#3b82f6;--cyan:#06b6d4;
+  --blue:#3b82f6;--cyan:#06b6d4;--purple:#a855f7;
   --radius:8px;--radius-lg:12px;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.5;min-height:100vh}
 .mono{font-family:'JetBrains Mono',monospace}
-/* Header */
+
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
 .topbar-left{display:flex;align-items:center;gap:12px}
 .logo{font-size:15px;font-weight:700;color:var(--cyan);letter-spacing:-0.5px}
@@ -31,7 +31,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .ws-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
 .ws-ok{background:var(--green);box-shadow:0 0 8px rgba(34,197,94,.4)}
 .ws-err{background:var(--red)}
-/* Price Banner */
+
 .price-banner{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;background:var(--surface);border-bottom:1px solid var(--border)}
 .price-left{display:flex;align-items:baseline;gap:12px}
 .price-symbol{font-size:13px;font-weight:600;color:var(--text2);letter-spacing:1px}
@@ -43,14 +43,14 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .price-stat{text-align:right}
 .price-stat-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:2px}
 .price-stat-value{font-size:14px;font-weight:600;font-family:'JetBrains Mono',monospace}
-/* Layout */
-.layout{display:grid;grid-template-columns:320px 1fr 320px;gap:1px;background:var(--border);min-height:calc(100vh - 120px)}
+
+.layout{display:grid;grid-template-columns:340px 1fr 340px;gap:1px;background:var(--border);min-height:calc(100vh - 120px)}
 .panel{background:var(--bg);overflow-y:auto}
 .panel-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
 .panel-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3)}
 .panel-body{padding:12px 16px}
-@media(max-width:1200px){.layout{grid-template-columns:1fr}.panel{max-height:none}}
-/* Cards */
+@media(max-width:1400px){.layout{grid-template-columns:1fr}.panel{max-height:none}}
+
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:12px;overflow:hidden}
 .card-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)}
 .card-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1.2px;color:var(--text3)}
@@ -58,13 +58,14 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .badge-green{background:var(--green-bg);color:var(--green)}
 .badge-red{background:var(--red-bg);color:var(--red)}
 .badge-yellow{background:var(--yellow-bg);color:var(--yellow)}
+.badge-purple{background:rgba(168,85,247,.1);color:var(--purple)}
 .card-body{padding:12px 14px}
-/* Row */
+
 .row{display:flex;align-items:center;justify-content:space-between;padding:5px 0;font-size:12px}
 .row+.row{border-top:1px solid var(--border)}
 .row-label{color:var(--text3);font-size:11px}
 .row-value{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500}
-/* Checkpoint */
+
 .cp{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:12px}
 .cp+.cp{border-top:1px solid var(--border)}
 .cp-icon{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0}
@@ -75,7 +76,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .cp-info{flex:1;min-width:0}
 .cp-name{font-weight:600;font-size:11px;margin-bottom:1px}
 .cp-detail{color:var(--text3);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-/* Setup Card */
+
 .setup{padding:10px;border-radius:var(--radius);margin-bottom:8px}
 .setup-long{background:var(--green-bg);border:1px solid var(--green-border)}
 .setup-short{background:var(--red-bg);border:1px solid var(--red-border)}
@@ -85,7 +86,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .setup-row{display:flex;justify-content:space-between;font-size:11px;padding:3px 0}
 .setup-row-label{color:var(--text3)}
 .setup-row-value{font-family:'JetBrains Mono',monospace;font-weight:500}
-/* Buttons */
+
 .btn{padding:8px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);color:var(--text);cursor:pointer;font-size:12px;font-weight:500;font-family:inherit;transition:all .15s}
 .btn:hover{border-color:var(--text3);background:var(--surface3)}
 .btn-long{border-color:var(--green-border);color:var(--green);background:var(--green-bg)}
@@ -98,12 +99,11 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .btn-auto-off{border-color:var(--text3);color:var(--text3)}
 .btn-sm{padding:5px 10px;font-size:11px}
 .btn-block{width:100%;display:block}
-.btn-group{display:flex;gap:6px}
-/* Input */
+
 .input{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--radius);font-size:12px;font-family:'JetBrains Mono',monospace;width:100%}
 .input:focus{outline:none;border-color:var(--cyan)}
 select.input{cursor:pointer}
-/* Position Card */
+
 .pos{padding:12px;border-radius:var(--radius);margin-bottom:8px}
 .pos-long{background:var(--green-bg);border:1px solid var(--green-border)}
 .pos-short{background:var(--red-bg);border:1px solid var(--red-border)}
@@ -112,45 +112,61 @@ select.input{cursor:pointer}
 .pos-pnl{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:14px}
 .pos-details{font-size:11px;color:var(--text3)}
 .pos-details span{margin-right:12px}
-/* Signal Alert */
+
 .signal-alert{padding:12px;border-radius:var(--radius);text-align:center;margin-bottom:8px}
 .signal-alert-long{background:var(--green-bg);border:2px solid var(--green)}
 .signal-alert-short{background:var(--red-bg);border:2px solid var(--red)}
 .signal-alert-title{font-size:14px;font-weight:700;margin-bottom:4px}
 .signal-alert-details{font-size:11px;color:var(--text2)}
-/* Trade Log */
+
 .log-entry{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:11px;border-bottom:1px solid var(--border)}
 .log-icon{width:20px;text-align:center}
-.log-time{color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:10px;min-width:50px}
 .log-detail{flex:1}
-.log-pnl{font-family:'JetBrains Mono',monospace;font-weight:600}
-/* Metric */
+
 .metric{padding:10px 0;text-align:center}
 .metric-value{font-size:20px;font-weight:700;font-family:'JetBrains Mono',monospace}
 .metric-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
-/* Grid */
+
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
-.grid-4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px}
-/* Scrollbar */
+
 ::-webkit-scrollbar{width:6px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 ::-webkit-scrollbar-thumb:hover{background:var(--text3)}
-/* Stage badges */
+
 .stage{font-size:11px;font-weight:600;padding:3px 8px;border-radius:4px}
 .stage-ready{background:var(--green-bg);color:var(--green)}
 .stage-waiting{background:var(--surface2);color:var(--text3)}
 .stage-weak{background:var(--yellow-bg);color:var(--yellow)}
 .stage-blocked{background:var(--red-bg);color:var(--red)}
+
+/* Phase indicator */
+.phase{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:var(--radius);font-size:12px;font-weight:600}
+.phase-accumulation{background:rgba(59,130,246,.1);color:var(--blue);border:1px solid rgba(59,130,246,.2)}
+.phase-distribution{background:rgba(168,85,247,.1);color:var(--purple);border:1px solid rgba(168,85,247,.2)}
+.phase-spring{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
+.phase-upthrust{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)}
+.phase-markup{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
+.phase-markdown{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)}
+.phase-unknown{background:var(--surface2);color:var(--text3);border:1px solid var(--border)}
+
+/* Liq cluster bar */
+.liq-bar{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11px}
+.liq-bar-fill{height:8px;border-radius:4px;min-width:4px}
+.liq-bar-long{background:var(--green)}
+.liq-bar-short{background:var(--red)}
+
+/* Cascade pulse */
+@keyframes cascade-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.7;transform:scale(1.02)}}
+.cascade-active{animation:cascade-pulse 1.5s infinite}
 </style>
 </head>
 <body>
 
-<!-- TOPBAR -->
 <div class="topbar">
   <div class="topbar-left">
-    <div class="logo">🧠 Smart Money <span>Terminal v4</span></div>
+    <div class="logo">🧠 Smart Money <span>Market Mechanics v5</span></div>
     <div class="status-pill status-live">LIVE</div>
   </div>
   <div style="display:flex;align-items:center;gap:12px">
@@ -159,7 +175,6 @@ select.input{cursor:pointer}
   </div>
 </div>
 
-<!-- PRICE BANNER -->
 <div class="price-banner">
   <div class="price-left">
     <div>
@@ -172,142 +187,169 @@ select.input{cursor:pointer}
   </div>
   <div class="price-right">
     <div class="price-stat">
-      <div class="price-stat-label">Mark</div>
-      <div class="price-stat-value" id="mark-price">$0.00</div>
+      <div class="price-stat-label">Session</div>
+      <div class="price-stat-value" id="session-label">--</div>
+    </div>
+    <div class="price-stat">
+      <div class="price-stat-label">BTC</div>
+      <div class="price-stat-value" id="btc-price">$0</div>
     </div>
     <div class="price-stat">
       <div class="price-stat-label">Funding</div>
       <div class="price-stat-value" id="funding-rate">0.0000%</div>
     </div>
     <div class="price-stat">
-      <div class="price-stat-label">OI Total</div>
-      <div class="price-stat-value" id="oi-total">$0</div>
-    </div>
-    <div class="price-stat">
-      <div class="price-stat-label">Imbalance</div>
-      <div class="price-stat-value" id="imbalance">0.0%</div>
+      <div class="price-stat-label">ATR</div>
+      <div class="price-stat-value" id="atr-value">$0.00</div>
     </div>
   </div>
 </div>
 
-<!-- MAIN LAYOUT -->
 <div class="layout">
 
-<!-- ═══ LEFT PANEL: Signals & Pipeline ═══ -->
+<!-- ═══ LEFT: Market Mechanics Signals ═══ -->
 <div class="panel">
   <div class="panel-header">
-    <div class="panel-title">Signal Pipeline</div>
+    <div class="panel-title">⚙️ Market Mechanics</div>
     <div class="stage stage-waiting" id="pipeline-stage">Initializing</div>
   </div>
   <div class="panel-body">
 
-    <!-- Checkpoints -->
+    <!-- Mechanics Checkpoints -->
     <div class="card">
       <div class="card-head">
-        <div class="card-label">Checkpoints</div>
-        <div style="font-size:11px"><span id="cp-passed" style="color:var(--green)">0</span>/<span id="cp-total">5</span></div>
+        <div class="card-label">Mechanic Signals</div>
+        <div style="font-size:11px"><span id="cp-passed" style="color:var(--green)">0</span>/<span id="cp-total">6</span></div>
       </div>
       <div class="card-body" id="checkpoints"></div>
     </div>
 
-    <!-- Setups -->
+    <!-- Wyckoff Phase -->
     <div class="card">
       <div class="card-head">
-        <div class="card-label">Setups</div>
+        <div class="card-label">Wyckoff Phase</div>
+        <div id="wyckoff-badge" class="card-badge">--</div>
       </div>
-      <div class="card-body" id="setups">
-        <div style="color:var(--text3);font-size:11px;text-align:center;padding:8px">No setups forming</div>
+      <div class="card-body">
+        <div style="text-align:center;margin-bottom:8px">
+          <div id="wyckoff-phase" class="phase phase-unknown">Detecting...</div>
+        </div>
+        <div class="row"><span class="row-label">Range High</span><span class="row-value" id="wyckoff-high">$0</span></div>
+        <div class="row"><span class="row-label">Range Low</span><span class="row-value" id="wyckoff-low">$0</span></div>
+        <div class="row"><span class="row-label">Spring</span><span class="row-value" id="wyckoff-spring">No</span></div>
+        <div class="row"><span class="row-label">Upthrust</span><span class="row-value" id="wyckoff-upthrust">No</span></div>
+      </div>
+    </div>
+
+    <!-- Liquidation Cascade -->
+    <div class="card" id="cascade-card">
+      <div class="card-head">
+        <div class="card-label">🔥 Liquidation Cascade</div>
+        <div id="cascade-badge" class="card-badge">Inactive</div>
+      </div>
+      <div class="card-body" id="cascade-body">
+        <div style="color:var(--text3);font-size:11px;text-align:center">No cascade active</div>
       </div>
     </div>
 
     <!-- Active Signal -->
     <div id="signal-alert"></div>
 
+    <!-- Setups -->
+    <div class="card">
+      <div class="card-head"><div class="card-label">Trade Setups</div></div>
+      <div class="card-body" id="setups">
+        <div style="color:var(--text3);font-size:11px;text-align:center;padding:8px">No setups forming</div>
+      </div>
+    </div>
+
   </div>
 </div>
 
-<!-- ═══ CENTER PANEL: Market Data ═══ -->
+<!-- ═══ CENTER: Market Context ═══ -->
 <div class="panel">
   <div class="panel-header">
-    <div class="panel-title">Market Data</div>
+    <div class="panel-title">📊 Market Context</div>
   </div>
   <div class="panel-body">
 
-    <!-- CVD -->
+    <!-- BTC Correlation -->
     <div class="card">
       <div class="card-head">
-        <div class="card-label">CVD — Buying/Selling Pressure</div>
+        <div class="card-label">BTC Correlation</div>
+        <div id="btc-agreement" class="card-badge">--</div>
+      </div>
+      <div class="card-body">
+        <div class="grid-3" style="margin-bottom:8px">
+          <div class="metric"><div class="metric-value" id="btc-chg-5m">0%</div><div class="metric-label">BTC 5m</div></div>
+          <div class="metric"><div class="metric-value" id="btc-chg-15m">0%</div><div class="metric-label">BTC 15m</div></div>
+          <div class="metric"><div class="metric-value" id="eth-btc-ratio">0</div><div class="metric-label">ETH/BTC</div></div>
+        </div>
+        <div id="btc-detail" style="text-align:center;font-size:11px;color:var(--text3);padding:6px;border-radius:var(--radius);background:var(--surface2)"></div>
+      </div>
+    </div>
+
+    <!-- Liquidation Heatmap -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-label">Liquidation Heatmap</div>
+        <div class="card-badge badge-purple">Estimated</div>
+      </div>
+      <div class="card-body">
+        <div class="grid-2" style="margin-bottom:8px">
+          <div class="metric"><div class="metric-value" id="liq-oi-total">0</div><div class="metric-label">OI Total</div></div>
+          <div class="metric"><div class="metric-value" id="liq-ls-ratio">0</div><div class="metric-label">L/S Ratio</div></div>
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Long Liquidation Clusters (below)</div>
+        <div id="liq-long-clusters"></div>
+        <div style="font-size:10px;color:var(--text3);margin:8px 0 6px;text-transform:uppercase;letter-spacing:1px">Short Liquidation Clusters (above)</div>
+        <div id="liq-short-clusters"></div>
+      </div>
+    </div>
+
+    <!-- Liquidity Sweep -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-label">Liquidity Sweep</div>
+        <div id="sweep-badge" class="card-badge">No sweep</div>
+      </div>
+      <div class="card-body" id="sweep-body">
+        <div style="color:var(--text3);font-size:11px;text-align:center">Watching for stop hunts...</div>
+      </div>
+    </div>
+
+    <!-- CVD (compact) -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-label">CVD</div>
         <div class="card-badge" id="cvd-trend-badge">--</div>
       </div>
       <div class="card-body">
-        <div class="grid-4" style="margin-bottom:8px">
-          <div class="metric"><div class="metric-value" id="cvd-total">0</div><div class="metric-label">Total</div></div>
-          <div class="metric"><div class="metric-value" id="cvd-1m">0</div><div class="metric-label">1 Min</div></div>
-          <div class="metric"><div class="metric-value" id="cvd-5m">0</div><div class="metric-label">5 Min</div></div>
-          <div class="metric"><div class="metric-value" id="cvd-15m">0</div><div class="metric-label">15 Min</div></div>
-        </div>
-        <div id="cvd-trend" style="text-align:center;font-size:12px;font-weight:600;padding:6px;border-radius:var(--radius);background:var(--surface2)"></div>
-      </div>
-    </div>
-
-    <!-- Order Book + Whale Flow side by side -->
-    <div class="grid-2">
-      <div class="card">
-        <div class="card-head"><div class="card-label">Order Book</div></div>
-        <div class="card-body">
-          <div class="row"><span class="row-label">Bids</span><span class="row-value" id="bid-val">$0</span></div>
-          <div class="row"><span class="row-label">Asks</span><span class="row-value" id="ask-val">$0</span></div>
-          <div class="row"><span class="row-label">Imbalance</span><span class="row-value" id="imb-val">0%</span></div>
-          <div class="row"><span class="row-label">Spread</span><span class="row-value" id="spread-val">0%</span></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-head"><div class="card-label">Whale Flow</div></div>
-        <div class="card-body">
-          <div class="row"><span class="row-label">Buys</span><span class="row-value" id="lt-buy">0</span></div>
-          <div class="row"><span class="row-label">Sells</span><span class="row-value" id="lt-sell">0</span></div>
-          <div class="row"><span class="row-label">Net</span><span class="row-value" id="lt-net">0</span></div>
-          <div class="row"><span class="row-label">Largest</span><span class="row-value" id="lt-largest">0</span></div>
+        <div class="grid-3">
+          <div class="metric"><div class="metric-value" id="cvd-5m" style="font-size:16px">0</div><div class="metric-label">5m</div></div>
+          <div class="metric"><div class="metric-value" id="cvd-15m" style="font-size:16px">0</div><div class="metric-label">15m</div></div>
+          <div class="metric"><div class="metric-value" id="cvd-div" style="font-size:16px">--</div><div class="metric-label">Divergence</div></div>
         </div>
       </div>
     </div>
 
-    <!-- OI + Momentum -->
-    <div class="grid-2">
-      <div class="card">
-        <div class="card-head"><div class="card-label">Open Interest</div></div>
-        <div class="card-body">
-          <div class="row"><span class="row-label">Binance</span><span class="row-value" id="oi-binance">$0</span></div>
-          <div class="row"><span class="row-label">Bybit</span><span class="row-value" id="oi-bybit">$0</span></div>
-          <div class="row"><span class="row-label">OKX</span><span class="row-value" id="oi-okx">$0</span></div>
-          <div class="row"><span class="row-label">Total</span><span class="row-value" id="oi-total-card">$0</span></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-head"><div class="card-label">Momentum</div></div>
-        <div class="card-body">
-          <div class="row"><span class="row-label">10s</span><span class="row-value" id="accel-10s">0</span></div>
-          <div class="row"><span class="row-label">30s</span><span class="row-value" id="accel-30s">0</span></div>
-          <div id="accel-sig" style="text-align:center;font-size:11px;padding:6px;border-radius:var(--radius);background:var(--surface2);margin-top:6px"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Anomalies -->
+    <!-- Order Book (compact) -->
     <div class="card">
-      <div class="card-head"><div class="card-label">🚨 Anomalies</div></div>
-      <div class="card-body" id="anomalies">
-        <div style="color:var(--text3);font-size:11px;text-align:center">No alerts</div>
+      <div class="card-head"><div class="card-label">Order Book</div></div>
+      <div class="card-body">
+        <div class="row"><span class="row-label">Bids</span><span class="row-value" id="bid-val">$0</span></div>
+        <div class="row"><span class="row-label">Asks</span><span class="row-value" id="ask-val">$0</span></div>
+        <div class="row"><span class="row-label">Imbalance</span><span class="row-value" id="imb-val">0%</span></div>
       </div>
     </div>
 
   </div>
 </div>
 
-<!-- ═══ RIGHT PANEL: Trading ═══ -->
+<!-- ═══ RIGHT: Trading ═══ -->
 <div class="panel">
   <div class="panel-header">
-    <div class="panel-title">Trading</div>
+    <div class="panel-title">💰 Trading</div>
     <div style="display:flex;align-items:center;gap:6px">
       <span style="font-size:10px;color:var(--text3)">AUTO</span>
       <button class="btn btn-sm btn-auto-off" id="auto-btn" onclick="toggleAuto()">OFF</button>
@@ -355,12 +397,11 @@ select.input{cursor:pointer}
             </select>
           </div>
         </div>
-        <button class="btn btn-close btn-block btn-sm" onclick="closeAll()">✖ Close All Positions</button>
-        <button class="btn btn-block btn-sm" onclick="downloadData()" style="margin-top:6px;border-color:var(--cyan);color:var(--cyan)">📥 Download Trade Data</button>
+        <button class="btn btn-close btn-block btn-sm" onclick="closeAll()">✖ Close All</button>
       </div>
     </div>
 
-    <!-- Open Positions -->
+    <!-- Positions -->
     <div class="card">
       <div class="card-head">
         <div class="card-label">Positions</div>
@@ -373,10 +414,8 @@ select.input{cursor:pointer}
 
     <!-- Trade Log -->
     <div class="card">
-      <div class="card-head">
-        <div class="card-label">Recent Activity</div>
-      </div>
-      <div class="card-body" id="trade-log" style="max-height:240px;overflow-y:auto">
+      <div class="card-head"><div class="card-label">Recent Activity</div></div>
+      <div class="card-body" id="trade-log" style="max-height:200px;overflow-y:auto">
         <div style="color:var(--text3);font-size:11px;text-align:center;padding:8px">No trades yet</div>
       </div>
     </div>
@@ -393,10 +432,8 @@ const fmtK=v=>{const n=Number(v||0);return n>=1e6?'$'+(n/1e6).toFixed(1)+'M':n>=
 const clr=v=>v>0?'var(--green)':v<0?'var(--red)':'var(--text3)';
 const clrClass=v=>v>0?'price-up':v<0?'price-down':'';
 
-// Clock
 setInterval(()=>{$('clock').textContent=new Date().toLocaleTimeString()},1000);
 
-// WebSocket
 let ws;function connect(){
 ws=new WebSocket(`wss://${location.host}/ws`);
 ws.onopen=()=>{$('ws-dot').className='ws-dot ws-ok'};
@@ -408,18 +445,17 @@ connect();
 function render(d){
 const price=d.price||0;
 $('price').textContent=fmt$(price);
-$('mark-price').textContent=fmt$(d.mark_price);
 
-// Pipeline
-const pipe=d.pipeline||{};
+// ═══ MECHANICS PIPELINE (PRIMARY) ═══
+const mech=d.mechanics||{};
 const stage=$('pipeline-stage');
-stage.textContent=pipe.stage||'...';
-if(pipe.ready){stage.className='stage stage-ready'}
-else if(pipe.direction){stage.className='stage stage-weak'}
+stage.textContent=mech.stage||'...';
+if(mech.ready){stage.className='stage stage-ready'}
+else if(mech.direction){stage.className='stage stage-weak'}
 else{stage.className='stage stage-waiting'}
 
-// Checkpoints
-const cps=pipe.checkpoints||[];
+// Mechanics checkpoints
+const cps=mech.checkpoints||[];
 $('cp-passed').textContent=cps.filter(c=>c.status==='PASS').length;
 $('cp-total').textContent=cps.length;
 let cpHtml='';
@@ -427,25 +463,153 @@ cps.forEach(cp=>{
   let cls='cp-neutral';let icon='○';
   if(cp.status==='PASS'){cls='cp-pass';icon='✓'}
   else if(cp.status==='WEAK'){cls='cp-weak';icon='~'}
-  else if(cp.status==='DANGER'){cls='cp-danger';icon='!'}
+  else if(cp.status==='BLOCK'){cls='cp-danger';icon='✕'}
   cpHtml+=`<div class="cp"><div class="cp-icon ${cls}">${icon}</div><div class="cp-info"><div class="cp-name">${cp.name}</div><div class="cp-detail">${cp.detail}</div></div></div>`;
 });
 $('checkpoints').innerHTML=cpHtml||'<div style="color:var(--text3);font-size:11px;text-align:center">Initializing...</div>';
 
-// Setups
-const ls=pipe.long_setup,ss=pipe.short_setup;
-let sHtml='';
-if(ls){sHtml+=`<div class="setup setup-long"><div class="setup-header"><div class="setup-dir" style="color:var(--green)">🟢 LONG</div><div class="setup-rr" style="background:var(--green-bg);color:var(--green)">1:${ls.rr}</div></div><div class="setup-row"><span class="setup-row-label">Entry</span><span class="setup-row-value">${fmt$(ls.entry)}</span></div><div class="setup-row"><span class="setup-row-label">Stop Loss</span><span class="setup-row-value" style="color:var(--red)">${fmt$(ls.stop_loss)}</span></div><div class="setup-row"><span class="setup-row-label">Target</span><span class="setup-row-value" style="color:var(--green)">${fmt$(ls.target)}</span></div><div class="setup-row"><span class="setup-row-label">Source</span><span class="setup-row-value" style="font-size:10px;color:var(--text3)">${ls.stop_source||'atr'}→${ls.tp_source||'atr'}</span></div><button class="btn btn-long btn-block btn-sm" style="margin-top:6px" onclick="openTrade('LONG',${ls.stop_loss},${ls.target})">Execute LONG</button></div>`}
-if(ss){sHtml+=`<div class="setup setup-short"><div class="setup-header"><div class="setup-dir" style="color:var(--red)">🔴 SHORT</div><div class="setup-rr" style="background:var(--red-bg);color:var(--red)">1:${ss.rr}</div></div><div class="setup-row"><span class="setup-row-label">Entry</span><span class="setup-row-value">${fmt$(ss.entry)}</span></div><div class="setup-row"><span class="setup-row-label">Stop Loss</span><span class="setup-row-value" style="color:var(--red)">${fmt$(ss.stop_loss)}</span></div><div class="setup-row"><span class="setup-row-label">Target</span><span class="setup-row-value" style="color:var(--green)">${fmt$(ss.target)}</span></div><div class="setup-row"><span class="setup-row-label">Source</span><span class="setup-row-value" style="font-size:10px;color:var(--text3)">${ss.stop_source||'atr'}→${ss.tp_source||'atr'}</span></div><button class="btn btn-short btn-block btn-sm" style="margin-top:6px" onclick="openTrade('SHORT',${ss.stop_loss},${ss.target})">Execute SHORT</button></div>`}
-$('setups').innerHTML=sHtml||'<div style="color:var(--text3);font-size:11px;text-align:center;padding:8px">No setups forming</div>';
+// ═══ WYCKOFF PHASE ═══
+const wyck=d.wyckoff||{};
+const wPhase=wyck.phase||'UNKNOWN';
+const wBadge=$('wyckoff-badge');
+const wDiv=$('wyckoff-phase');
+wDiv.textContent=wPhase;
+wDiv.className='phase phase-'+wPhase.toLowerCase();
+if(wPhase==='SPRING'){wBadge.textContent='🟢 LONG';wBadge.className='card-badge badge-green'}
+else if(wPhase==='UPTHRUST'){wBadge.textContent='🔴 SHORT';wBadge.className='card-badge badge-red'}
+else if(wPhase==='ACCUMULATION'){wBadge.textContent='⏳ Wait';wBadge.className='card-badge'}
+else if(wPhase==='DISTRIBUTION'){wBadge.textContent='⏳ Wait';wBadge.className='card-badge'}
+else if(wPhase==='MARKUP'){wBadge.textContent='🟢 Trend';wBadge.className='card-badge badge-green'}
+else if(wPhase==='MARKDOWN'){wBadge.textContent='🔴 Trend';wBadge.className='card-badge badge-red'}
+else{wBadge.textContent='--';wBadge.className='card-badge'}
+$('wyckoff-high').textContent=fmt$(wyck.range_high);
+$('wyckoff-low').textContent=fmt$(wyck.range_low);
+$('wyckoff-spring').textContent=wyck.spring_detected?'🟢 YES':'No';
+$('wyckoff-spring').style.color=wyck.spring_detected?'var(--green)':'var(--text3)';
+$('wyckoff-upthrust').textContent=wyck.upthrust_detected?'🔴 YES':'No';
+$('wyckoff-upthrust').style.color=wyck.upthrust_detected?'var(--red)':'var(--text3)';
 
-// Signal alert
-if(pipe.ready&&pipe.signal){
-  const sig=pipe.signal;
-  $('signal-alert').innerHTML=`<div class="signal-alert signal-alert-${sig.direction.toLowerCase()}"><div class="signal-alert-title">🎯 ${sig.direction} SIGNAL</div><div class="signal-alert-details">Score ${sig.score>0?'+':''}${sig.score} · R:R 1:${sig.rr} · ${sig.reasons?.length||0} reasons</div></div>`;
+// ═══ LIQUIDATION CASCADE ═══
+const liq=d.liquidation||{};
+const cascade=liq.cascade_signal||null;
+const cascadeCard=$('cascade-card');
+const cascadeBadge=$('cascade-badge');
+const cascadeBody=$('cascade-body');
+if(cascade){
+  cascadeCard.classList.add('cascade-active');
+  cascadeBadge.textContent=cascade.type;
+  cascadeBadge.className='card-badge badge-red';
+  cascadeBody.innerHTML=`<div style="font-size:12px;font-weight:600;color:var(--red)">${cascade.signal}</div><div style="font-size:11px;color:var(--text3);margin-top:4px">Elapsed: ${Math.round(cascade.elapsed)}s</div>`;
+}else{
+  cascadeCard.classList.remove('cascade-active');
+  cascadeBadge.textContent='Inactive';
+  cascadeBadge.className='card-badge';
+  cascadeBody.innerHTML='<div style="color:var(--text3);font-size:11px;text-align:center">No cascade active</div>';
+}
+
+// ═══ SIGNAL ALERT ═══
+if(mech.ready&&mech.signal){
+  const sig=mech.signal;
+  const reasonsHtml=(sig.reasons||[]).map(r=>`<div style="font-size:10px;color:var(--text2)">• ${r}</div>`).join('');
+  $('signal-alert').innerHTML=`<div class="signal-alert signal-alert-${sig.direction.toLowerCase()}"><div class="signal-alert-title">🎯 ${sig.direction} SIGNAL</div><div class="signal-alert-details">R:R 1:${sig.rr} · SL ${fmt$(sig.stop_loss)} · TP ${fmt$(sig.target)}</div>${reasonsHtml}</div>`;
 }else{$('signal-alert').innerHTML=''}
 
-// Trade status
+// ═══ SETUPS ═══
+// Show mechanic signal setups if available
+const mechSig=mech.signal;
+if(mechSig){
+  const cls=mechSig.direction==='LONG'?'setup-long':'setup-short';
+  const dirColor=mechSig.direction==='LONG'?'var(--green)':'var(--red)';
+  $('setups').innerHTML=`<div class="setup ${cls}"><div class="setup-header"><div class="setup-dir" style="color:${dirColor}">${mechSig.direction==='LONG'?'🟢':'🔴'} ${mechSig.direction}</div><div class="setup-rr" style="background:${mechSig.direction==='LONG'?'var(--green-bg)':'var(--red-bg)'};color:${dirColor}">1:${mechSig.rr}</div></div><div class="setup-row"><span class="setup-row-label">Entry</span><span class="setup-row-value">${fmt$(mechSig.entry)}</span></div><div class="setup-row"><span class="setup-row-label">Stop Loss</span><span class="setup-row-value" style="color:var(--red)">${fmt$(mechSig.stop_loss)}</span></div><div class="setup-row"><span class="setup-row-label">Target</span><span class="setup-row-value" style="color:var(--green)">${fmt$(mechSig.target)}</span></div><div class="setup-row"><span class="setup-row-label">ATR</span><span class="setup-row-value">${fmt$(mechSig.atr)}</span></div><div class="setup-row"><span class="setup-row-label">Trail</span><span class="setup-row-value">${fmt$(mechSig.trail_distance)}</span></div><button class="btn ${mechSig.direction==='LONG'?'btn-long':'btn-short'} btn-block btn-sm" style="margin-top:6px" onclick="openTrade('${mechSig.direction}',${mechSig.stop_loss},${mechSig.target})">Execute ${mechSig.direction}</button></div>`;
+}else{
+  // Show long/short setups from mechanics if available
+  $('setups').innerHTML='<div style="color:var(--text3);font-size:11px;text-align:center;padding:8px">No setups forming</div>';
+}
+
+// ═══ BTC CORRELATION ═══
+const btc=d.btc||{};
+$('btc-price').textContent=fmt$(btc.btc_price);
+$('btc-chg-5m').textContent=(btc.btc_change_5m>=0?'+':'')+btc.btc_change_5m?.toFixed(3)+'%';
+$('btc-chg-5m').style.color=clr(btc.btc_change_5m);
+$('btc-chg-15m').textContent=(btc.btc_change_15m>=0?'+':'')+btc.btc_change_15m?.toFixed(3)+'%';
+$('btc-chg-15m').style.color=clr(btc.btc_change_15m);
+$('eth-btc-ratio').textContent=btc.eth_btc_ratio?.toFixed(6)||'0';
+const btcAgree=$('btc-agreement');
+// Get agreement from mechanics checkpoints
+const btcCp=cps.find(c=>c.name==='BTC');
+if(btcCp){
+  if(btcCp.status==='PASS'){btcAgree.textContent='✅ Agree';btcAgree.className='card-badge badge-green'}
+  else if(btcCp.status==='BLOCK'){btcAgree.textContent='❌ Disagree';btcAgree.className='card-badge badge-red'}
+  else{btcAgree.textContent='⚪ Neutral';btcAgree.className='card-badge'}
+  $('btc-detail').textContent=btcCp.detail;
+}else{btcAgree.textContent='--';$('btc-detail').textContent=''}
+
+// ═══ LIQUIDATION HEATMAP ═══
+$('liq-oi-total').textContent=fmtK(liq.oi_total);
+$('liq-ls-ratio').textContent=liq.long_short_ratio?.toFixed(2)||'0';
+// Long clusters
+const longClusters=liq.nearest_long_liq?[liq.nearest_long_liq]:[];
+let lHtml='';
+if(liq.nearest_long_liq){
+  const dist=((price-liq.nearest_long_liq)/price*100).toFixed(2);
+  lHtml=`<div class="liq-bar"><div class="liq-bar-fill liq-bar-long" style="width:${Math.min(dist*10,100)}%"></div><span style="font-family:'JetBrains Mono',monospace">${fmt$(liq.nearest_long_liq)} (${dist}% away)</span></div>`;
+}
+$('liq-long-clusters').innerHTML=lHtml||'<div style="color:var(--text3);font-size:10px">No clusters detected</div>';
+// Short clusters
+let sHtml='';
+if(liq.nearest_short_liq){
+  const dist=((liq.nearest_short_liq-price)/price*100).toFixed(2);
+  sHtml=`<div class="liq-bar"><div class="liq-bar-fill liq-bar-short" style="width:${Math.min(dist*10,100)}%"></div><span style="font-family:'JetBrains Mono',monospace">${fmt$(liq.nearest_short_liq)} (${dist}% away)</span></div>`;
+}
+$('liq-short-clusters').innerHTML=sHtml||'<div style="color:var(--text3);font-size:10px">No clusters detected</div>';
+
+// ═══ LIQUIDITY SWEEP ═══
+const sweep=d.sweep||{};
+const sweepBadge=$('sweep-badge');
+const sweepBody=$('sweep-body');
+if(sweep.last_sweep){
+  const s=sweep.last_sweep;
+  sweepBadge.textContent=s.direction;
+  sweepBadge.className=s.direction==='LONG'?'card-badge badge-green':'card-badge badge-red';
+  sweepBody.innerHTML=`<div style="font-size:12px;font-weight:600;color:${s.direction==='LONG'?'var(--green)':'var(--red)'}">${s.signal}</div><div style="font-size:11px;color:var(--text3);margin-top:4px">Level: ${fmt$(s.level_price)} · Depth: ${s.sweep_depth_pct}% · Age: ${Math.round(s.age_seconds)}s</div>`;
+}else{
+  sweepBadge.textContent='No sweep';
+  sweepBadge.className='card-badge';
+  sweepBody.innerHTML='<div style="color:var(--text3);font-size:11px;text-align:center">Watching for stop hunts...</div>';
+}
+
+// ═══ SESSION ═══
+const session=d.session||{};
+$('session-label').textContent=session.session||'--';
+$('session-label').style.color=session.quality_raw==='high'?'var(--green)':session.quality_raw==='low'?'var(--red)':'var(--text2)';
+
+// ═══ ATR ═══
+const atr=d.atr||{};
+$('atr-value').textContent=fmt$(atr.atr);
+$('atr-value').style.color=atr.volatility?.includes('HIGH')?'var(--red)':atr.volatility?.includes('LOW')?'var(--green)':'var(--text2)';
+
+// ═══ CVD (compact) ═══
+const cvd=d.cvd||{};
+$('cvd-5m').textContent=(cvd.cvd_roc_5m>=0?'+':'')+((cvd.cvd_roc_5m)||0).toFixed(0);$('cvd-5m').style.color=clr(cvd.cvd_roc_5m);
+$('cvd-15m').textContent=(cvd.cvd_roc_15m>=0?'+':'')+((cvd.cvd_roc_15m)||0).toFixed(0);$('cvd-15m').style.color=clr(cvd.cvd_roc_15m);
+const div=cvd.divergence;
+if(div){$('cvd-div').textContent=div.type==='BEARISH'?'🔴 BEAR':'🟢 BULL';$('cvd-div').style.color=div.type==='BEARISH'?'var(--red)':'var(--green)'}
+else{$('cvd-div').textContent='--';$('cvd-div').style.color='var(--text3)'}
+const trend=cvd.cvd_trend||'--';
+const trendBadge=$('cvd-trend-badge');
+if(trend.includes('BUY')){trendBadge.textContent='BUY';trendBadge.className='card-badge badge-green'}
+else if(trend.includes('SELL')){trendBadge.textContent='SELL';trendBadge.className='card-badge badge-red'}
+else{trendBadge.textContent='FLAT';trendBadge.className='card-badge'}
+
+// ═══ ORDER BOOK (compact) ═══
+$('bid-val').textContent=fmtK(d.bid_total_usd)+' ('+((d.bid_pct)||50).toFixed(0)+'%)';
+$('ask-val').textContent=fmtK(d.ask_total_usd)+' ('+((d.ask_pct)||50).toFixed(0)+'%)';
+const imb=d.imbalance||0;$('imb-val').textContent=imb.toFixed(1)+'%';$('imb-val').style.color=clr(imb);
+
+// ═══ FUNDING ═══
+const fr=d.funding_rate_pct||0;$('funding-rate').textContent=fr.toFixed(4)+'%';$('funding-rate').style.color=fr>0.01?'var(--red)':fr<-0.005?'var(--green)':'var(--text2)';
+
+// ═══ TRADING ═══
 const ts=d.trade_status||{};
 $('acct-balance').textContent=fmt$(ts.balance);
 $('acct-available').textContent=fmt$(ts.available);
@@ -455,8 +619,6 @@ $('acct-trades').textContent=(ts.stats?.total_trades||0);
 const wr=ts.stats?((ts.stats.wins||0)/Math.max(ts.stats.total_trades,1)*100).toFixed(0):'0';
 $('acct-wr').textContent=wr+'%';$('acct-wr').style.color=wr>=50?'var(--green)':'var(--red)';
 $('lev-badge').textContent=(ts.leverage||5)+'x';
-
-// Auto button
 const autoBtn=$('auto-btn');
 if(ts.auto_trade){autoBtn.textContent='ON';autoBtn.className='btn btn-sm btn-auto-on'}
 else{autoBtn.textContent='OFF';autoBtn.className='btn btn-sm btn-auto-off'}
@@ -467,59 +629,16 @@ $('pos-count').textContent=positions.length;
 if(positions.length===0){$('positions-list').innerHTML='<div style="color:var(--text3);font-size:11px;text-align:center;padding:8px">No open positions</div>'}
 else{let h='';positions.forEach(p=>{
   const cls=p.side==='LONG'?'pos-long':'pos-short';
-  h+=`<div class="pos ${cls}"><div class="pos-header"><div class="pos-side" style="color:${p.side==='LONG'?'var(--green)':'var(--red)'}">${p.side}</div><div class="pos-pnl" style="color:${p.pnl>=0?'var(--green)':'var(--red)'}">${fmt$(p.pnl)} (${p.pnl_pct}%)</div></div><div class="pos-details"><span>Entry ${fmt$(p.entry)}</span><span>Mark ${fmt$(p.mark)}</span><span>${p.amount} ETH</span><span>${p.lev}x</span></div><div class="pos-details" style="margin-top:4px"><span>Liq ${fmt$(p.liq)}</span></div><button class="btn btn-close btn-sm" style="margin-top:6px;width:100%" onclick="closeTrade('${p.side}')">Close ${p.side}</button></div>`;
+  h+=`<div class="pos ${cls}"><div class="pos-header"><div class="pos-side" style="color:${p.side==='LONG'?'var(--green)':'var(--red)'}">${p.side}</div><div class="pos-pnl" style="color:${p.pnl>=0?'var(--green)':'var(--red)'}">${fmt$(p.pnl)} (${p.pnl_pct}%)</div></div><div class="pos-details"><span>Entry ${fmt$(p.entry)}</span><span>Mark ${fmt$(p.mark)}</span><span>${p.amount} ETH</span><span>${p.lev}x</span></div><button class="btn btn-close btn-sm" style="margin-top:6px;width:100%" onclick="closeTrade('${p.side}')">Close ${p.side}</button></div>`;
 });$('positions-list').innerHTML=h}
 
 // Trade log
 const recent=ts.recent_trades||[];
-if(recent.length>0){let h='';recent.slice(-8).reverse().forEach(t=>{
-  h+=`<div class="log-entry"><div class="log-icon">${t.auto_executed?'🤖':'👤'}</div><div class="log-detail"><span style="color:${t.direction==='LONG'?'var(--green)':'var(--red)'};font-weight:600">${t.direction}</span> <span style="color:var(--text3)">${fmt$(t.entry)} → SL ${fmt$(t.sl)} / TP ${fmt$(t.tp)}</span></div></div>`;
+if(recent.length>0){let h='';recent.slice(-6).reverse().forEach(t=>{
+  h+=`<div class="log-entry"><div class="log-icon">${t.auto_executed?'🤖':'👤'}</div><div class="log-detail"><span style="color:${t.direction==='LONG'?'var(--green)':'var(--red)'};font-weight:600">${t.direction}</span> <span style="color:var(--text3)">${fmt$(t.entry)} → ${t.result||'OPEN'}</span></div></div>`;
 });$('trade-log').innerHTML=h}else{$('trade-log').innerHTML='<div style="color:var(--text3);font-size:11px;text-align:center;padding:8px">No trades yet</div>'}
-
-// CVD
-const cvd=d.cvd||{};
-$('cvd-total').textContent=(cvd.cvd>=0?'+':'')+((cvd.cvd)||0).toFixed(0);$('cvd-total').style.color=clr(cvd.cvd);
-$('cvd-1m').textContent=(cvd.cvd_roc_1m>=0?'+':'')+((cvd.cvd_roc_1m)||0).toFixed(0);$('cvd-1m').style.color=clr(cvd.cvd_roc_1m);
-$('cvd-5m').textContent=(cvd.cvd_roc_5m>=0?'+':'')+((cvd.cvd_roc_5m)||0).toFixed(0);$('cvd-5m').style.color=clr(cvd.cvd_roc_5m);
-$('cvd-15m').textContent=(cvd.cvd_roc_15m>=0?'+':'')+((cvd.cvd_roc_15m)||0).toFixed(0);$('cvd-15m').style.color=clr(cvd.cvd_roc_15m);
-const trend=cvd.cvd_trend||'--';$('cvd-trend').textContent=trend;
-const trendBadge=$('cvd-trend-badge');
-if(trend.includes('BUY')){trendBadge.textContent='BUYING';trendBadge.className='card-badge badge-green'}
-else if(trend.includes('SELL')){trendBadge.textContent='SELLING';trendBadge.className='card-badge badge-red'}
-else{trendBadge.textContent='NEUTRAL';trendBadge.className='card-badge'}
-
-// Order book
-$('bid-val').textContent=fmtK(d.bid_total_usd)+' ('+((d.bid_pct)||50).toFixed(0)+'%)';
-$('ask-val').textContent=fmtK(d.ask_total_usd)+' ('+((d.ask_pct)||50).toFixed(0)+'%)';
-const imb=d.imbalance||0;$('imb-val').textContent=imb.toFixed(1)+'%';$('imb-val').style.color=clr(imb);
-$('spread-val').textContent=((d.spread_pct)||0).toFixed(3)+'%';
-
-// Whale flow
-$('lt-buy').textContent=((d.large_buys)||0).toFixed(1)+' ETH ('+((d.large_buy_count)||0)+')';
-$('lt-sell').textContent=((d.large_sells)||0).toFixed(1)+' ETH ('+((d.large_sell_count)||0)+')';
-const ln=d.large_net||0;$('lt-net').textContent=(ln>=0?'+':'')+ln.toFixed(1)+' ETH';$('lt-net').style.color=clr(ln);
-$('lt-largest').textContent=((d.largest_trade)||0).toFixed(2)+' ETH';
-
-// OI
-const cross=d.cross_oi||{};const oiBy=cross.oi_by_exchange||{};
-$('oi-binance').textContent=fmtK(oiBy.Binance);$('oi-bybit').textContent=fmtK(oiBy.Bybit);$('oi-okx').textContent=fmtK(oiBy.OKX);
-$('oi-total').textContent=fmtK(cross.oi_total);$('oi-total-card').textContent=fmtK(cross.oi_total);
-const fr=d.funding_rate_pct||0;$('funding-rate').textContent=fr.toFixed(4)+'%';$('funding-rate').style.color=fr>0.01?'var(--red)':fr<-0.005?'var(--green)':'var(--text2)';
-$('imbalance').textContent=imb.toFixed(1)+'%';$('imbalance').style.color=clr(imb);
-
-// Momentum
-const a10=d.accel_10s||0,a30=d.accel_30s||0;
-$('accel-10s').textContent=(a10>=0?'+':'')+a10.toFixed(0);$('accel-10s').style.color=clr(a10);
-$('accel-30s').textContent=(a30>=0?'+':'')+a30.toFixed(0);$('accel-30s').style.color=clr(a30);
-$('accel-sig').textContent=d.accel_signal||'--';
-
-// Anomalies
-const alerts=d.anomaly_alerts||[];
-if(alerts.length>0){let h='';alerts.forEach(a=>{h+=`<div class="row"><span class="row-label">${a.severity} ${a.label}</span><span class="row-value" style="color:${a.direction.includes('UP')?'var(--green)':'var(--red)'}">${a.current?.toFixed(1)||0} (z=${a.z_score?.toFixed(1)||0})</span></div>`});$('anomalies').innerHTML=h}
-else{$('anomalies').innerHTML='<div style="color:var(--text3);font-size:11px;text-align:center">No alerts</div>'}
 }
 
-// ═══ ACTIONS ═══
 function openTrade(dir,sl,tp){
   const usdt=parseInt($('trade-amount').value)||100;
   fetch('/api/trade/open',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -542,19 +661,6 @@ function setLeverage(lev){
   fetch('/api/trade/leverage',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({leverage:parseInt(lev)})}).then(r=>r.json()).then(d=>{console.log('Lev:',d)});
 }
-
-function downloadData(){
-  fetch('/api/export').then(function(r){return r.json()}).then(function(d){
-    var blob=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});
-    var url=URL.createObjectURL(blob);
-    var a=document.createElement('a');
-    a.href=url;
-    a.download='smart_money_trades_'+new Date().toISOString().slice(0,10)+'.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  });
-}
 </script>
 </body>
 </html>
-

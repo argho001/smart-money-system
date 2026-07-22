@@ -18,6 +18,7 @@ Data sources:
 - Price levels where stops cluster
 """
 
+import asyncio
 import time
 import aiohttp
 from collections import deque
@@ -379,7 +380,3 @@ class LiquidationHeatmap:
             "cascade_direction": self.cascade_direction,
             "cascade_signal": cascade,
         }
-
-
-# Need asyncio import
-import asyncio
