@@ -42,6 +42,82 @@ class ContrarianPipeline:
         checkpoints = []
 
         # ═══════════════════════════════════════════════════════
+        # CHECKPOINT 0: HIGHER TIMEFRAME TREND FILTER
+        # Only trade in the direction of the 15m+ trend
+        # Fading WITH the trend = high probability
+        # Fading AGAINST the trend = getting run over
+        # ═══════════════════════════════════════════════════════
+        mtf = state.get("mtf", {})
+        mtf_15m = mtf.get("15m", {})
+        mtf_5m = mtf.get("5m", {})
+        
+        # Use 15m trend as primary filter
+        trend_direction = None
+        trend_score = 0
+        
+        buy_pct_15m = mtf_15m.get("buy_pct", 50)
+        buy_pct_5m = mtf_5m.get("buy_pct", 50)
+        
+        # Strong trend: both 5m and 15m agree
+        if buy_pct_15m > 58 and buy_pct_5m > 55:
+            trend_direction = "LONG"
+            trend_score = 3
+            checkpoints.append({
+                "name": "TREND",
+                "status": "PASS",
+                "detail": f"🟢 Uptrend — 15m {buy_pct_15m:.0f}% buy, 5m {buy_pct_5m:.0f}% buy",
+                "score": 3,
+                "direction": "LONG",
+                "type": "trend",
+                "weight": "heavy",
+            })
+        elif buy_pct_15m < 42 and buy_pct_5m < 45:
+            trend_direction = "SHORT"
+            trend_score = 3
+            checkpoints.append({
+                "name": "TREND",
+                "status": "PASS",
+                "detail": f"🔴 Downtrend — 15m {buy_pct_15m:.0f}% buy, 5m {buy_pct_5m:.0f}% buy",
+                "score": 3,
+                "direction": "SHORT",
+                "type": "trend",
+                "weight": "heavy",
+            })
+        elif buy_pct_15m > 55:
+            trend_direction = "LONG"
+            trend_score = 1
+            checkpoints.append({
+                "name": "TREND",
+                "status": "WEAK",
+                "detail": f"🟡 Mild uptrend — 15m {buy_pct_15m:.0f}% buy",
+                "score": 1,
+                "direction": "LONG",
+                "type": "trend",
+                "weight": "medium",
+            })
+        elif buy_pct_15m < 45:
+            trend_direction = "SHORT"
+            trend_score = 1
+            checkpoints.append({
+                "name": "TREND",
+                "status": "WEAK",
+                "detail": f"🟡 Mild downtrend — 15m {buy_pct_15m:.0f}% buy",
+                "score": 1,
+                "direction": "SHORT",
+                "type": "trend",
+                "weight": "medium",
+            })
+        else:
+            checkpoints.append({
+                "name": "TREND",
+                "status": "NEUTRAL",
+                "detail": f"⚪ No clear trend — 15m {buy_pct_15m:.0f}% buy",
+                "score": 0,
+                "direction": None,
+                "type": "trend",
+            })
+
+        # ═══════════════════════════════════════════════════════
         # CHECKPOINT 1: CVD DIVERGENCE — The best predictive signal
         # When price makes new high but CVD doesn't = institutions selling
         # When price makes new low but CVD doesn't = institutions buying
@@ -360,7 +436,7 @@ class ContrarianPipeline:
             })
 
         # ═══════════════════════════════════════════════════════
-        # SCORING — Contrarian logic
+        # SCORING — Contrarian + Trend Filter
         # ═══════════════════════════════════════════════════════
         total_score = sum(cp["score"] for cp in checkpoints)
         passed = sum(1 for cp in checkpoints if cp["status"] == "PASS")
@@ -369,24 +445,47 @@ class ContrarianPipeline:
         heavy_signals = [cp for cp in checkpoints if cp.get("weight") == "heavy" and cp["score"] > 0]
         level_signal = any(cp.get("type") == "level" and cp["score"] > 0 for cp in checkpoints)
         contrarian_passed = sum(1 for cp in checkpoints if cp.get("type") == "contrarian" and cp["status"] == "PASS")
+        trend_cp = next((cp for cp in checkpoints if cp.get("type") == "trend"), None)
+        trend_dir = trend_cp["direction"] if trend_cp else None
 
         # Determine direction from contrarian signals
         long_score = sum(cp["score"] for cp in checkpoints if cp["direction"] == "LONG" and cp["score"] > 0)
         short_score = sum(cp["score"] for cp in checkpoints if cp["direction"] == "SHORT" and cp["score"] > 0)
 
         if long_score > short_score and long_score >= 4:
-            direction = "LONG"
+            raw_direction = "LONG"
         elif short_score > long_score and short_score >= 4:
-            direction = "SHORT"
+            raw_direction = "SHORT"
         else:
-            direction = None
+            raw_direction = None
+
+        # ═══ TREND FILTER ═══
+        # Only trade WITH the trend. If contrarian signal opposes trend → block it.
+        # Exception: if trend is NEUTRAL (no clear direction), allow both.
+        direction = None
+        trend_blocked = False
+        
+        if raw_direction and trend_dir:
+            if raw_direction == trend_dir:
+                # Contrarian signal aligns with trend → proceed
+                direction = raw_direction
+            else:
+                # Contrarian signal opposes trend → BLOCK
+                trend_blocked = True
+                direction = None
+        elif raw_direction and trend_dir is None:
+            # No clear trend → allow contrarian signal (but lower confidence)
+            direction = raw_direction
+        else:
+            direction = raw_direction
 
         # ═══════════════════════════════════════════════════════
         # SIGNAL GENERATION
         # ═══════════════════════════════════════════════════════
-        # Need: direction + at least 1 contrarian PASS + at level OR 2 contrarian PASS
+        # Need: direction WITH trend + at least 1 contrarian PASS + at level OR 2 contrarian PASS
         can_signal = (
             direction
+            and not trend_blocked
             and (contrarian_passed >= 2 or (contrarian_passed >= 1 and level_signal))
             and (now - self.last_signal_time > self.cooldown)
         )
@@ -409,14 +508,16 @@ class ContrarianPipeline:
         short_setup = self._build_setup(state, "SHORT", checkpoints, atr_engine) if atr_engine else None
 
         # Stage
-        if not direction:
+        if trend_blocked:
+            stage = f"🛑 TREND BLOCKED — contrarian {raw_direction} but trend is {trend_dir}"
+        elif not direction:
             stage = "⏳ WAITING — no contrarian signal"
         elif contrarian_passed == 0:
             stage = "🔍 SCANNING — need contrarian confirmation"
         elif contrarian_passed >= 1 and level_signal:
-            stage = "🟢 AT LEVEL + CONTRARIAN — best setup"
+            stage = "🟢 AT LEVEL + CONTRARIAN + TREND — best setup"
         elif contrarian_passed >= 2:
-            stage = "🟢 MULTIPLE CONTRARIANS — strong setup"
+            stage = "🟢 MULTIPLE CONTRARIANS + TREND — strong setup"
         elif not ready:
             stage = "⏳ COOLDOWN"
         else:
