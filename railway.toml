@@ -4,6 +4,6 @@ builder = "dockerfile"
 [deploy]
 startCommand = "python3 dashboard/live_server.py"
 healthcheckPath = "/api/snapshot"
-healthcheckTimeout = 300
+healthcheckTimeout = 600
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3

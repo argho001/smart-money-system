@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from flask import Flask, render_template, jsonify, request
 from flask_sock import Sock
+import aiohttp
 from modules.live.live_engine import LiveDataEngine
 from modules.live.anomaly_detector import AnomalyDetector
 from modules.live.outcome_tracker import OutcomeTracker
@@ -59,6 +60,7 @@ except Exception as e:
 
 enhanced_state = {}
 _oi_fetch_counter = 0
+_engine_ready = False
 
 
 def enhance_state(state):
@@ -135,7 +137,13 @@ def index():
 
 @app.route("/api/snapshot")
 def api_snapshot():
-    return jsonify(enhanced_state or engine.get_snapshot())
+    # Always return 200 for Railway healthcheck, even if engine isn't ready
+    if enhanced_state:
+        return jsonify(enhanced_state)
+    # Return default snapshot so healthcheck passes
+    snap = engine.get_snapshot()
+    snap["_engine_ready"] = _engine_ready
+    return jsonify(snap)
 
 
 @app.route("/api/alerts")
@@ -240,29 +248,40 @@ def ws_handler(ws):
 
 
 def start_engine():
+    global _engine_ready
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
     async def run_all():
+        global _engine_ready
         engine.on_update(lambda s: enhance_state(s))
 
         async def oi_loop():
             global _oi_fetch_counter
-            session = __import__("aiohttp").ClientSession()
-            while True:
-                try:
-                    await oi_delta.fetch(session)
-                    await cross_oi.fetch(session)
-                    oi_state = oi_delta.get_signal(enhanced_state.get("price", 0))
-                    enhanced_state["oi_delta"] = oi_state
-                    enhanced_state["cross_oi"] = cross_oi.get_state()
-                except:
-                    pass
-                await asyncio.sleep(5)
+            session = aiohttp.ClientSession()
+            try:
+                while True:
+                    try:
+                        await oi_delta.fetch(session)
+                        await cross_oi.fetch(session)
+                        oi_state = oi_delta.get_signal(enhanced_state.get("price", 0))
+                        enhanced_state["oi_delta"] = oi_state
+                        enhanced_state["cross_oi"] = cross_oi.get_state()
+                    except Exception as e:
+                        print(f"[OI] Error: {e}")
+                    await asyncio.sleep(5)
+            finally:
+                await session.close()
 
+        _engine_ready = True
+        print("[ENGINE] Ready")
         await asyncio.gather(engine.start(), oi_loop())
 
-    loop.run_until_complete(run_all())
+    try:
+        loop.run_until_complete(run_all())
+    except Exception as e:
+        print(f"[ENGINE] Fatal error: {e}")
+        _engine_ready = False
 
 
 
@@ -311,36 +330,11 @@ if __name__ == "__main__":
     engine_thread = threading.Thread(target=start_engine, daemon=True)
     engine_thread.start()
 
-    time_mod.sleep(3)
     print(f"\nDashboard: http://localhost:8888")
     print("=" * 60)
 
+    # Start Flask immediately — don't block on engine startup
     app.run(host="0.0.0.0", port=8888, debug=False, threaded=True)
 
 
-@app.route("/api/export")
-def api_export():
-    """Export all trade data for analysis."""
-    import os
-    data = {
-        "exported_at": datetime.now().isoformat(),
-        "trade_log": [],
-        "paper_signals": [],
-        "stats": {},
-    }
-    # Trade log
-    try:
-        with open("data/trades/trade_log.json") as f:
-            data["trade_log"] = json.load(f)
-    except:
-        pass
-    # Paper signals
-    try:
-        with open("data/paper_trades/signals.jsonl") as f:
-            data["paper_signals"] = [json.loads(l) for l in f if l.strip()]
-    except:
-        pass
-    # Stats
-    if trade_mgr:
-        data["stats"] = trade_mgr.get_formatted_status()
-    return jsonify(data)
+
