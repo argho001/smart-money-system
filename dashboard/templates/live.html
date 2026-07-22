@@ -318,22 +318,7 @@ select.input{cursor:pointer}
       </div>
     </div>
 
-    <!-- CVD (compact) -->
-    <div class="card">
-      <div class="card-head">
-        <div class="card-label">CVD</div>
-        <div class="card-badge" id="cvd-trend-badge">--</div>
-      </div>
-      <div class="card-body">
-        <div class="grid-3">
-          <div class="metric"><div class="metric-value" id="cvd-5m" style="font-size:16px">0</div><div class="metric-label">5m</div></div>
-          <div class="metric"><div class="metric-value" id="cvd-15m" style="font-size:16px">0</div><div class="metric-label">15m</div></div>
-          <div class="metric"><div class="metric-value" id="cvd-div" style="font-size:16px">--</div><div class="metric-label">Divergence</div></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Order Book (compact) -->
+    <!-- Order Book -->
     <div class="card">
       <div class="card-head"><div class="card-label">Order Book</div></div>
       <div class="card-body">
@@ -588,18 +573,6 @@ const atr=d.atr||{};
 $('atr-value').textContent=fmt$(atr.atr);
 $('atr-value').style.color=atr.volatility?.includes('HIGH')?'var(--red)':atr.volatility?.includes('LOW')?'var(--green)':'var(--text2)';
 
-// ═══ CVD (compact) ═══
-const cvd=d.cvd||{};
-$('cvd-5m').textContent=(cvd.cvd_roc_5m>=0?'+':'')+((cvd.cvd_roc_5m)||0).toFixed(0);$('cvd-5m').style.color=clr(cvd.cvd_roc_5m);
-$('cvd-15m').textContent=(cvd.cvd_roc_15m>=0?'+':'')+((cvd.cvd_roc_15m)||0).toFixed(0);$('cvd-15m').style.color=clr(cvd.cvd_roc_15m);
-const div=cvd.divergence;
-if(div){$('cvd-div').textContent=div.type==='BEARISH'?'🔴 BEAR':'🟢 BULL';$('cvd-div').style.color=div.type==='BEARISH'?'var(--red)':'var(--green)'}
-else{$('cvd-div').textContent='--';$('cvd-div').style.color='var(--text3)'}
-const trend=cvd.cvd_trend||'--';
-const trendBadge=$('cvd-trend-badge');
-if(trend.includes('BUY')){trendBadge.textContent='BUY';trendBadge.className='card-badge badge-green'}
-else if(trend.includes('SELL')){trendBadge.textContent='SELL';trendBadge.className='card-badge badge-red'}
-else{trendBadge.textContent='FLAT';trendBadge.className='card-badge'}
 
 // ═══ ORDER BOOK (compact) ═══
 $('bid-val').textContent=fmtK(d.bid_total_usd)+' ('+((d.bid_pct)||50).toFixed(0)+'%)';

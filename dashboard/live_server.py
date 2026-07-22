@@ -1,6 +1,12 @@
 """
-Smart Money System - Live Dashboard Server v4
-Trading terminal: signals + execution + tracking
+Smart Money System — Live Dashboard v5 (Simplified)
+Only uses signals proven in backtest:
+1. Liquidity sweep (support/resistance break + recovery)
+2. Wyckoff spring/upthrust (false breakouts)
+3. Funding extreme (crowd is wrong)
+4. ATR-based SL/TP
+5. BTC correlation filter
+6. Session filter
 """
 import asyncio
 import json
@@ -14,49 +20,29 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from flask import Flask, render_template, jsonify, request
 from flask_sock import Sock
 import aiohttp
+
+# Only the engines we actually use
 from modules.live.live_engine import LiveDataEngine
-from modules.live.anomaly_detector import AnomalyDetector
-from modules.live.outcome_tracker import OutcomeTracker
-from modules.live.entry_exit_engine import EntryExitEngine
-from modules.live.signal_pipeline import SignalPipeline
-from modules.live.contrarian_pipeline import ContrarianPipeline
 from modules.live.atr_engine import ATREngine
 from modules.live.btc_correlation import BTCCorrelation
 from modules.live.session_filter import SessionFilter
 from modules.live.liquidation_heatmap import LiquidationHeatmap
 from modules.live.liquidity_sweep import LiquiditySweepDetector
 from modules.live.wyckoff_detector import WyckoffPhase
-from modules.live.mechanics_pipeline import MechanicsPipeline
-from modules.live.cvd_engine import CVDEngine
-from modules.live.oi_delta import OIDeltaTracker
-from modules.live.liquidation_clusters import LiquidationClusters
-from modules.live.vpin_engine import VpineEngine
-from modules.live.cross_exchange_oi import CrossExchangeOI
 
 app = Flask(__name__)
 sock = Sock(app)
 
-# Core engines
+# Core engines (only what backtest uses)
 engine = LiveDataEngine()
-anomaly = AnomalyDetector()
-outcome = OutcomeTracker()
-entry_exit = EntryExitEngine()
-pipeline = SignalPipeline()
-contrarian = ContrarianPipeline()
 atr = ATREngine(period=14)
 btc_corr = BTCCorrelation()
 session_filter = SessionFilter()
 liq_heatmap = LiquidationHeatmap()
 sweep_detector = LiquiditySweepDetector()
 wyckoff = WyckoffPhase()
-mechanics = MechanicsPipeline()
-cvd = CVDEngine()
-oi_delta = OIDeltaTracker()
-liq_clusters = LiquidationClusters()
-vpin = VpineEngine()
-cross_oi = CrossExchangeOI()
 
-# Trade Manager
+# Trade manager (loaded if Binance keys exist)
 trade_mgr = None
 try:
     from config import settings
@@ -75,110 +61,172 @@ except Exception as e:
     print(f"[TRADE] Init failed: {e}")
 
 enhanced_state = {}
-_oi_fetch_counter = 0
 _engine_ready = False
+_last_signal_time = 0
+SIGNAL_COOLDOWN = 300  # 5 min between signals
 
 
 def enhance_state(state):
-    global enhanced_state, _oi_fetch_counter
+    """Process live state and generate signals using backtested logic."""
+    global enhanced_state, _last_signal_time
 
-    # Update ATR with current price
     price = state.get("price", 0)
-    if price > 0:
-        atr.update(price)
-        # Update BTC correlation with ETH price
-        btc_corr.update_eth_price(price)
+    if price == 0:
+        return state
 
-    # CVD
-    trades = list(engine._last_trades)[-100:]
-    cvd.update(trades)
-    state["cvd"] = cvd.get_state()
+    # Update ATR
+    atr.update(price)
 
-    # Liquidation clusters
-    bids, asks = [], []
-    for l in state.get("support_levels", []):
-        bids.append([str(l["price"]), str(l.get("strength", 1))])
-    for l in state.get("resistance_levels", []):
-        asks.append([str(l["price"]), str(l.get("strength", 1))])
-    liq_clusters.update(state.get("price", 0), bids, asks, state.get("funding_rate", 0))
-    state["liq_clusters"] = liq_clusters.get_state(state.get("price", 0))
+    # Update BTC correlation
+    btc_corr.update_eth_price(price)
 
-    # VPIN
-    vpin.update(trades)
-    state["vpin"] = vpin.get_state()
+    # Update Wyckoff
+    wyckoff.update(price)
 
-    # Anomaly
-    alerts = anomaly.update(state)
-    state["anomaly_alerts"] = [
-        {"severity": a["severity"], "label": a["label"], "current": a["current"],
-         "z_score": a["z_score"], "direction": a["direction"]} for a in alerts
-    ]
+    # Update liquidity sweep
+    support = state.get("support_levels", [])
+    resistance = state.get("resistance_levels", [])
+    sweep_detector.update(price, support_levels=support, resistance_levels=resistance)
 
-    # Outcome
-    outcome.log_state(state)
-    outcome.check_outcomes(state.get("price", 0))
-    outlook = outcome.get_current_setup_outlook(state)
-    state["setup_outlook"] = outlook
+    # ═══════════════════════════════════════════════════════════
+    # SIGNAL DETECTION — Same logic as backtest
+    # ═══════════════════════════════════════════════════════════
+    score = 0
+    direction = None
+    reasons = []
 
-    # Entry/Exit
-    signal = entry_exit.evaluate(state, outlook)
-    if signal:
-        state["trade_signal"] = signal
-    elif entry_exit.last_signal and time_mod.time() - entry_exit.last_signal_time < 600:
-        state["trade_signal"] = entry_exit.last_signal
+    # Signal 1: Liquidity Sweep
+    sweep = sweep_detector.detect_sweep()
+    if sweep:
+        score += 4
+        direction = sweep["direction"]
+        reasons.append(sweep["signal"])
+
+    # Signal 2: Wyckoff Spring/Upthrust
+    wyckoff_signal = wyckoff.get_signal()
+    if wyckoff_signal and wyckoff_signal.get("direction"):
+        phase = wyckoff_signal["phase"]
+        if phase in ("SPRING", "UPTHRUST"):
+            score += 3
+            if not direction:
+                direction = wyckoff_signal["direction"]
+            reasons.append(wyckoff_signal["signal"])
+
+    # Signal 3: Funding Extreme
+    funding = state.get("funding_rate_pct", 0)
+    if funding > 0.06:
+        score += 2
+        if not direction:
+            direction = "SHORT"
+        reasons.append(f"Extreme long funding ({funding:+.4f}%)")
+    elif funding < -0.02:
+        score += 2
+        if not direction:
+            direction = "LONG"
+        reasons.append(f"Extreme short funding ({funding:+.4f}%)")
+
+    # Filter: BTC Correlation
+    mtf = state.get("mtf", {})
+    mtf_5m = mtf.get("5m", {})
+    eth_buy_pct = mtf_5m.get("buy_pct", 50)
+    eth_change = (eth_buy_pct - 50) / 50 * 0.5
+    btc_ctx = btc_corr.get_btc_context(eth_change)
+
+    if direction == "LONG" and btc_ctx.get("btc_change_5m", 0) > 0.1:
+        score += 1
+        reasons.append(f"BTC confirming ({btc_ctx['btc_change_5m']:+.2f}%)")
+    elif direction == "SHORT" and btc_ctx.get("btc_change_5m", 0) < -0.1:
+        score += 1
+        reasons.append(f"BTC confirming ({btc_ctx['btc_change_5m']:+.2f}%)")
+    elif direction and ((direction == "LONG" and btc_ctx.get("btc_change_5m", 0) < -0.3) or
+                        (direction == "SHORT" and btc_ctx.get("btc_change_5m", 0) > 0.3)):
+        score -= 2
+        reasons.append(f"⚠️ BTC diverges ({btc_ctx['btc_change_5m']:+.2f}%)")
+
+    # Filter: Session
+    session_info = session_filter.get_session()
+    session_quality = session_info.get("quality_raw", "medium")
+    if session_quality == "high":
+        score += 1
+        reasons.append("US session (high quality)")
+    elif session_quality == "low":
+        score -= 1
+        reasons.append(f"{session_info.get('session', '?')} session (low quality)")
+
+    # ═══════════════════════════════════════════════════════════
+    # BUILD SIGNAL (if score >= 6 and cooldown passed)
+    # ═══════════════════════════════════════════════════════════
+    signal = None
+    now = time_mod.time()
+
+    if direction and score >= 6 and (now - _last_signal_time > SIGNAL_COOLDOWN):
+        levels = atr.get_levels(price, direction, sl_mult=1.5, tp_mult=2.5)
+        if levels and levels["rr"] >= 1.5:
+            signal = {
+                "time": now,
+                "direction": direction,
+                "entry": levels["entry"],
+                "stop_loss": levels["sl"],
+                "target": levels["tp"],
+                "risk": levels["risk"],
+                "reward": levels["reward"],
+                "rr": levels["rr"],
+                "sl_pct": levels["sl_pct"],
+                "tp_pct": levels["tp_pct"],
+                "atr": levels["atr"],
+                "trail_distance": round(atr.get_trail_distance(1.0), 2),
+                "score": score,
+                "reasons": reasons,
+            }
+            _last_signal_time = now
+
+    # Build stage text
+    if not direction:
+        stage = "⏳ WAITING — no signal"
+    elif score < 6:
+        stage = f"🔍 WEAK — score {score}/6 needed"
+    elif signal:
+        stage = "🟢 SIGNAL READY"
     else:
-        state["trade_signal"] = None
+        stage = "⏳ COOLDOWN"
 
-    # Pipeline v3 (legacy — still available)
-    state["pipeline"] = pipeline.evaluate(state)
+    # Package everything for dashboard
+    state["signal"] = {
+        "stage": stage,
+        "direction": direction,
+        "score": score,
+        "ready": signal is not None,
+        "signal": signal,
+    }
 
-    # Contrarian Pipeline v4 (legacy — still available)
-    state["contrarian"] = contrarian.evaluate(state, atr, btc_engine=btc_corr, session_filter=session_filter)
-    
-    # Mechanics Pipeline v5 (new — based on how market actually works)
-    state["mechanics"] = mechanics.evaluate(
-        state, atr,
-        btc_engine=btc_corr,
-        session_filter=session_filter,
-        liq_heatmap=liq_heatmap,
-        sweep_detector=sweep_detector,
-        wyckoff=wyckoff
-    )
-    
-    # BTC context
-    state["btc"] = btc_corr.get_state()
-    
-    # Session info
-    state["session"] = session_filter.get_session()
-    
-    # Liquidation heatmap
-    state["liquidation"] = liq_heatmap.get_state()
-    
-    # Wyckoff phase
+    # Wyckoff state
     state["wyckoff"] = wyckoff.get_state()
-    
-    # Liquidity sweep
+
+    # Liquidity sweep state
     state["sweep"] = sweep_detector.get_state()
 
-    # ATR state
+    # Liquidation heatmap
+    state["liquidation"] = liq_heatmap.get_state()
+
+    # BTC context
+    state["btc"] = btc_corr.get_state()
+
+    # Session
+    state["session"] = session_info
+
+    # ATR
     state["atr"] = atr.get_state()
 
     # Trade status
     if trade_mgr:
         state["trade_status"] = trade_mgr.get_formatted_status()
-        # Auto-execute with MECHANICS pipeline (v5) — primary signal
-        mech_signal = state.get("mechanics", {})
-        if trade_mgr.auto_trade and mech_signal.get("ready"):
-            # Check if there's already an open position
-            has_position = False
-            for pos in trade_mgr.executor.get_positions():
-                if pos["symbol"] == trade_mgr.executor.symbol:
-                    has_position = True
-                    break
+        if trade_mgr.auto_trade and signal:
+            has_position = any(
+                pos["symbol"] == trade_mgr.executor.symbol
+                for pos in trade_mgr.executor.get_positions()
+            )
             if not has_position:
-                trade_mgr.process_signal(mech_signal)
-            else:
-                pass
+                trade_mgr.process_signal({"ready": True, "signal": signal})
 
     enhanced_state = state
     return state
@@ -191,28 +239,12 @@ def index():
 
 @app.route("/api/snapshot")
 def api_snapshot():
-    # Always return 200 for Railway healthcheck, even if engine isn't ready
     if enhanced_state:
         return jsonify(enhanced_state)
-    # Return default snapshot so healthcheck passes
     snap = engine.get_snapshot()
     snap["_engine_ready"] = _engine_ready
     return jsonify(snap)
 
-
-@app.route("/api/alerts")
-def api_alerts():
-    return jsonify(anomaly.get_recent_alerts(20))
-
-
-@app.route("/api/outcomes")
-def api_outcomes():
-    return jsonify(outcome.get_setup_stats())
-
-
-# ═══════════════════════════════════════════
-# TRADE API
-# ═══════════════════════════════════════════
 
 @app.route("/api/trade/status")
 def api_trade_status():
@@ -232,7 +264,6 @@ def api_trade_open():
     usdt = data.get("usdt", trade_mgr.usdt_per_trade)
     result = trade_mgr.executor.execute_signal(direction, sl, tp, usdt)
     if result.get("success") and sl and tp:
-        # Register SL/TP for monitoring
         trade_mgr.register_manual_stop(direction, sl, tp, data.get("entry", 0))
     return jsonify(result)
 
@@ -285,6 +316,29 @@ def api_trade_amount():
     return jsonify({"usdt_per_trade": usdt})
 
 
+@app.route("/api/export")
+def api_export():
+    data = {
+        "exported_at": datetime.now().isoformat(),
+        "trade_log": [],
+        "paper_signals": [],
+        "stats": {},
+    }
+    try:
+        with open("data/trades/trade_log.json") as f:
+            data["trade_log"] = json.load(f)
+    except:
+        pass
+    try:
+        with open("data/paper_trades/signals.jsonl") as f:
+            data["paper_signals"] = [json.loads(l) for l in f if l.strip()]
+    except:
+        pass
+    if trade_mgr:
+        data["stats"] = trade_mgr.get_formatted_status()
+    return jsonify(data)
+
+
 @sock.route("/ws")
 def ws_handler(ws):
     loop = asyncio.new_event_loop()
@@ -310,26 +364,16 @@ def start_engine():
         global _engine_ready
         engine.on_update(lambda s: enhance_state(s))
 
-        async def oi_loop():
-            global _oi_fetch_counter
+        async def liq_loop():
             session = aiohttp.ClientSession()
             try:
-                while True:
-                    try:
-                        await oi_delta.fetch(session)
-                        await cross_oi.fetch(session)
-                        oi_state = oi_delta.get_signal(enhanced_state.get("price", 0))
-                        enhanced_state["oi_delta"] = oi_state
-                        enhanced_state["cross_oi"] = cross_oi.get_state()
-                    except Exception as e:
-                        print(f"[OI] Error: {e}")
-                    await asyncio.sleep(5)
+                await liq_heatmap.start(session)
             finally:
                 await session.close()
 
         _engine_ready = True
         print("[ENGINE] Ready")
-        await asyncio.gather(engine.start(), oi_loop(), btc_corr.start(), liq_heatmap.start(aiohttp.ClientSession()))
+        await asyncio.gather(engine.start(), liq_loop(), btc_corr.start())
 
     try:
         loop.run_until_complete(run_all())
@@ -338,59 +382,27 @@ def start_engine():
         _engine_ready = False
 
 
-
-
-@app.route("/api/export")
-def api_export():
-    """Export all trade data for analysis."""
-    import os
-    data = {
-        "exported_at": datetime.now().isoformat(),
-        "trade_log": [],
-        "paper_signals": [],
-        "stats": {},
-    }
-    try:
-        with open("data/trades/trade_log.json") as f:
-            data["trade_log"] = json.load(f)
-    except:
-        pass
-    try:
-        with open("data/paper_trades/signals.jsonl") as f:
-            data["paper_signals"] = [json.loads(l) for l in f if l.strip()]
-    except:
-        pass
-    if trade_mgr:
-        data["stats"] = trade_mgr.get_formatted_status()
-    return jsonify(data)
 if __name__ == "__main__":
     import threading
 
     print("=" * 60)
-    print("SMART MONEY — LIVE TERMINAL v4")
+    print("SMART MONEY — MARKET MECHANICS v5")
     print("=" * 60)
-    print("Components:")
-    print("  ✅ Live data engine")
-    print("  ✅ CVD (Cumulative Volume Delta)")
-    print("  ✅ OI Delta tracker")
-    print("  ✅ Liquidation clusters")
-    print("  ✅ Cross-exchange OI rotation")
-    print("  ✅ Anomaly detector")
-    print("  ✅ Signal Pipeline v3 (5 checkpoints)")
-    print(f"  {'✅' if trade_mgr else '❌'} Trade executor {'(' + str(trade_mgr.leverage) + 'x leverage)' if trade_mgr else ''}")
-    print(f"  {'✅' if trade_mgr else '❌'} Auto-trade {'ON' if trade_mgr and trade_mgr.auto_trade else 'OFF'}")
+    print("Signals (proven in backtest):")
+    print("  ✅ Liquidity sweep (stop hunt + reversal)")
+    print("  ✅ Wyckoff spring/upthrust (false breakouts)")
+    print("  ✅ Funding extreme (crowd is wrong)")
+    print("  ✅ ATR-based SL/TP")
+    print("  ✅ BTC correlation filter")
+    print("  ✅ Session filter")
+    print(f"  {'✅' if trade_mgr else '❌'} Trade executor")
     print("Starting...")
 
     engine_thread = threading.Thread(target=start_engine, daemon=True)
     engine_thread.start()
 
-    print(f"\nDashboard: http://localhost:{os.environ.get('PORT', 8888)}")
+    port = int(os.environ.get("PORT", 8888))
+    print(f"\nDashboard: http://localhost:{port}")
     print("=" * 60)
 
-    # Railway sets PORT env var — use it, fallback to 8888
-    port = int(os.environ.get("PORT", 8888))
-    print(f"Listening on port {port}")
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
-
-
-
