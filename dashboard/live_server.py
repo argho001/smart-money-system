@@ -29,11 +29,12 @@ from modules.live.session_filter import SessionFilter
 from modules.live.liquidation_heatmap import LiquidationHeatmap
 from modules.live.liquidity_sweep import LiquiditySweepDetector
 from modules.live.wyckoff_detector import WyckoffPhase
+from modules.live.realtime_enhancer import RealtimeEnhancer
 
 app = Flask(__name__)
 sock = Sock(app)
 
-# Core engines (only what backtest uses)
+# Core engines (only what backtest uses + real-time enhancer)
 engine = LiveDataEngine()
 atr = ATREngine(period=14)
 btc_corr = BTCCorrelation()
@@ -41,6 +42,7 @@ session_filter = SessionFilter()
 liq_heatmap = LiquidationHeatmap()
 sweep_detector = LiquiditySweepDetector()
 wyckoff = WyckoffPhase()
+enhancer = RealtimeEnhancer()
 
 # Trade manager (loaded if Binance keys exist)
 trade_mgr = None
@@ -160,25 +162,45 @@ def enhance_state(state):
     now = time_mod.time()
 
     if direction and score >= 6 and (now - _last_signal_time > SIGNAL_COOLDOWN):
-        levels = atr.get_levels(price, direction, sl_mult=1.5, tp_mult=2.5)
-        if levels and levels["rr"] >= 1.5:
-            signal = {
-                "time": now,
-                "direction": direction,
-                "entry": levels["entry"],
-                "stop_loss": levels["sl"],
-                "target": levels["tp"],
-                "risk": levels["risk"],
-                "reward": levels["reward"],
-                "rr": levels["rr"],
-                "sl_pct": levels["sl_pct"],
-                "tp_pct": levels["tp_pct"],
-                "atr": levels["atr"],
-                "trail_distance": round(atr.get_trail_distance(1.0), 2),
-                "score": score,
-                "reasons": reasons,
-            }
-            _last_signal_time = now
+        # Build base signal
+        base_signal = {
+            "time": now,
+            "direction": direction,
+            "score": score,
+            "reasons": reasons,
+        }
+
+        # ═══ REAL-TIME ENHANCEMENT (additive only) ═══
+        # Check if real-time data suggests skipping
+        if enhancer.should_skip(base_signal, state):
+            signal = None
+            stage = "🛑 REALTIME SKIP — OI/crowd contradiction"
+        else:
+            # Enhance signal with real-time data
+            enhanced = enhancer.evaluate_signal(base_signal, state)
+            final_score = enhanced.get("score", score)
+            final_reasons = enhanced.get("reasons", reasons)
+
+            levels = atr.get_levels(price, direction, sl_mult=1.5, tp_mult=2.5)
+            if levels and levels["rr"] >= 1.5:
+                signal = {
+                    "time": now,
+                    "direction": direction,
+                    "entry": levels["entry"],
+                    "stop_loss": levels["sl"],
+                    "target": levels["tp"],
+                    "risk": levels["risk"],
+                    "reward": levels["reward"],
+                    "rr": levels["rr"],
+                    "sl_pct": levels["sl_pct"],
+                    "tp_pct": levels["tp_pct"],
+                    "atr": levels["atr"],
+                    "trail_distance": round(atr.get_trail_distance(1.0), 2),
+                    "score": final_score,
+                    "reasons": final_reasons,
+                    "realtime_boost": enhanced.get("confidence_boost", 0),
+                }
+                _last_signal_time = now
 
     # Build stage text
     if not direction:
@@ -216,6 +238,9 @@ def enhance_state(state):
 
     # ATR
     state["atr"] = atr.get_state()
+
+    # Real-time enhancer
+    state["realtime"] = enhancer.get_state()
 
     # Trade status
     if trade_mgr:
@@ -373,7 +398,7 @@ def start_engine():
 
         _engine_ready = True
         print("[ENGINE] Ready")
-        await asyncio.gather(engine.start(), liq_loop(), btc_corr.start())
+        await asyncio.gather(engine.start(), liq_loop(), btc_corr.start(), enhancer.start(aiohttp.ClientSession()))
 
     try:
         loop.run_until_complete(run_all())
